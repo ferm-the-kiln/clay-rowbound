@@ -1,6 +1,6 @@
 {
   "name": "rowbound",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Open-source CLI and MCP server for Google Sheets enrichment — waterfalls, conditions, HTTP API integrations",
   "type": "module",
   "bin": {
@@ -20,17 +20,17 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.12.1",
+    "@types/node": "^22.13.10",
     "commander": "^13.1.0",
     "dotenv": "^16.4.7",
     "jsonpath-plus": "^10.3.0",
     "picocolors": "^1.1.1",
+    "typescript": "^5.7.3",
     "zod": "^4.3.6"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.7",
-    "@types/node": "^22.13.10",
     "tsx": "^4.19.3",
-    "typescript": "^5.7.3",
     "vitest": "^3.0.9"
   },
   "license": "MIT",
