@@ -108,7 +108,7 @@ export function columnIndexToLetter(index: number): string {
  */
 export function runGws(args: string[]): Promise<string> {
   return new Promise((resolve, reject) => {
-    execFile("gws", args, (error, stdout, stderr) => {
+    execFile("gws", args, { maxBuffer: 50 * 1024 * 1024 }, (error, stdout, stderr) => {
       if (error) {
         if ((error as NodeJS.ErrnoException).code === "ENOENT") {
           reject(

@@ -28,6 +28,8 @@ export interface RunPipelineOptions {
   config: PipelineConfig;
   env: Record<string, string>;
   range?: string;
+  /** Specific row indices (0-based data indices) to process. Overrides range. */
+  rowSet?: Set<number>;
   actionFilter?: string;
   dryRun?: boolean;
   signal?: AbortSignal;
@@ -229,11 +231,26 @@ export async function runPipeline(
     ? config.actions.filter((s) => s.id === actionFilter)
     : config.actions;
 
-  // Parse range
-  const { start, end } = parseRange(range, rows.length);
+  // Determine which data row indices to process
+  const rowIndices: number[] = [];
+  if (options.rowSet && options.rowSet.size > 0) {
+    // Specific rows requested — sort them for sequential processing
+    for (const idx of options.rowSet) {
+      if (idx >= 0 && idx < rows.length) {
+        rowIndices.push(idx);
+      }
+    }
+    rowIndices.sort((a, b) => a - b);
+  } else {
+    // Contiguous range
+    const { start, end } = parseRange(range, rows.length);
+    for (let i = start; i < end; i++) {
+      rowIndices.push(i);
+    }
+  }
 
   // Notify caller of total rows to process (for progress display)
-  options.onTotalRows?.(end - start);
+  options.onTotalRows?.(rowIndices.length);
 
   const result: RunResult = {
     totalRows: rows.length,
@@ -250,7 +267,7 @@ export async function runPipeline(
     );
   }
 
-  for (let i = start; i < end; i++) {
+  for (const i of rowIndices) {
     // Check abort signal between rows
     if (signal?.aborted) {
       break;
@@ -263,6 +280,7 @@ export async function runPipeline(
       for (const [id, name] of Object.entries(options.columnMap)) {
         if (nameKeyedRow[name] !== undefined) {
           row[id] = nameKeyedRow[name];
+          row[name] = nameKeyedRow[name];
         }
       }
     } else {

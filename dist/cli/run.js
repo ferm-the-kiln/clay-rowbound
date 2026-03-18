@@ -57,12 +57,14 @@ export function registerRun(program) {
                 process.exitCode = 1;
                 return;
             }
-            if (opts.rows && !/^\d+-\d+$/.test(opts.rows)) {
-                logErr(`${error("Invalid --rows format.")} Expected e.g. 2-50.`);
+            const isRange = opts.rows ? /^\d+-\d+$/.test(opts.rows) : false;
+            const isList = opts.rows ? /^\d+(,\d+)*$/.test(opts.rows) : false;
+            if (opts.rows && !isRange && !isList) {
+                logErr(`${error("Invalid --rows format.")} Expected range (e.g. 2-50) or comma-separated rows (e.g. 100,200,300).`);
                 process.exitCode = 1;
                 return;
             }
-            if (opts.rows) {
+            if (opts.rows && isRange) {
                 const [startStr, endStr] = opts.rows.split("-");
                 const start = parseInt(startStr, 10);
                 const end = parseInt(endStr, 10);
@@ -83,8 +85,18 @@ export function registerRun(program) {
                 ...reconciled.config,
                 actions: tabConfig.actions,
             };
-            // Convert CLI range format (2-50) to engine format (2:50)
-            const range = opts.rows ? opts.rows.replace("-", ":") : undefined;
+            // Convert CLI row format to engine format
+            let range;
+            let rowSet;
+            if (opts.rows && isList) {
+                // Comma-separated rows: convert sheet rows to 0-based data indices
+                rowSet = new Set(opts.rows
+                    .split(",")
+                    .map((s) => parseInt(s, 10) - 2));
+            }
+            else if (opts.rows && isRange) {
+                range = opts.rows.replace("-", ":");
+            }
             // Build filtered env (only ROWBOUND_*, referenced {{env.X}}, NODE_ENV, PATH)
             const env = buildSafeEnv(resolvedConfig);
             // Set up abort controller for graceful shutdown
@@ -118,7 +130,7 @@ export function registerRun(program) {
                 log(`Filtering to action: ${bold(opts.action)}`);
             }
             if (opts.rows) {
-                log(`Row range: ${bold(opts.rows)}`);
+                log(`Rows: ${bold(opts.rows)}`);
             }
             log("");
             // Track total rows for progress display
@@ -130,6 +142,7 @@ export function registerRun(program) {
                 config: resolvedConfig,
                 env,
                 range,
+                rowSet,
                 actionFilter: opts.action,
                 dryRun: opts.dryRun,
                 signal: controller.signal,

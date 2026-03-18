@@ -121,10 +121,26 @@ export async function runPipeline(options) {
     const actions = actionFilter
         ? config.actions.filter((s) => s.id === actionFilter)
         : config.actions;
-    // Parse range
-    const { start, end } = parseRange(range, rows.length);
+    // Determine which data row indices to process
+    const rowIndices = [];
+    if (options.rowSet && options.rowSet.size > 0) {
+        // Specific rows requested — sort them for sequential processing
+        for (const idx of options.rowSet) {
+            if (idx >= 0 && idx < rows.length) {
+                rowIndices.push(idx);
+            }
+        }
+        rowIndices.sort((a, b) => a - b);
+    }
+    else {
+        // Contiguous range
+        const { start, end } = parseRange(range, rows.length);
+        for (let i = start; i < end; i++) {
+            rowIndices.push(i);
+        }
+    }
     // Notify caller of total rows to process (for progress display)
-    options.onTotalRows?.(end - start);
+    options.onTotalRows?.(rowIndices.length);
     const result = {
         totalRows: rows.length,
         processedRows: 0,
@@ -136,7 +152,7 @@ export async function runPipeline(options) {
     if (config.settings.concurrency > 1) {
         console.warn(`Warning: concurrency is set to ${config.settings.concurrency} but parallel row processing is not yet implemented. All rows will be processed sequentially (concurrency=1).`);
     }
-    for (let i = start; i < end; i++) {
+    for (const i of rowIndices) {
         // Check abort signal between rows
         if (signal?.aborted) {
             break;
@@ -148,6 +164,7 @@ export async function runPipeline(options) {
             for (const [id, name] of Object.entries(options.columnMap)) {
                 if (nameKeyedRow[name] !== undefined) {
                     row[id] = nameKeyedRow[name];
+                    row[name] = nameKeyedRow[name];
                 }
             }
         }

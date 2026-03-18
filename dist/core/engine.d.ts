@@ -5,6 +5,8 @@ export interface RunPipelineOptions {
     config: PipelineConfig;
     env: Record<string, string>;
     range?: string;
+    /** Specific row indices (0-based data indices) to process. Overrides range. */
+    rowSet?: Set<number>;
     actionFilter?: string;
     dryRun?: boolean;
     signal?: AbortSignal;

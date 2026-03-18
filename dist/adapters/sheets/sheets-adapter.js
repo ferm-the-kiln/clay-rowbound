@@ -84,7 +84,7 @@ export function columnIndexToLetter(index) {
  */
 export function runGws(args) {
     return new Promise((resolve, reject) => {
-        execFile("gws", args, (error, stdout, stderr) => {
+        execFile("gws", args, { maxBuffer: 50 * 1024 * 1024 }, (error, stdout, stderr) => {
             if (error) {
                 if (error.code === "ENOENT") {
                     reject(new Error("'gws' CLI not found. Rowbound requires the Google Workspace CLI (gws) to interact with Google Sheets.\n" +
