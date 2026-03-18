@@ -17,6 +17,7 @@ function mockGwsResponse(stdout: string) {
   mockExecFile.mockImplementation(((
     _cmd: unknown,
     _args: unknown,
+    _opts: unknown,
     callback: unknown,
   ) => {
     (callback as (err: null, stdout: string, stderr: string) => void)(
@@ -31,6 +32,7 @@ function mockGwsError(stderr: string) {
   mockExecFile.mockImplementation(((
     _cmd: unknown,
     _args: unknown,
+    _opts: unknown,
     callback: unknown,
   ) => {
     const err = new Error("gws failed");
@@ -52,6 +54,7 @@ function mockGwsSequence(
   mockExecFile.mockImplementation(((
     _cmd: unknown,
     _args: unknown,
+    _opts: unknown,
     callback: unknown,
   ) => {
     const resp = responses[callIndex] || responses[responses.length - 1];
@@ -120,6 +123,7 @@ describe("runGws", () => {
     expect(mockExecFile).toHaveBeenCalledWith(
       "gws",
       ["arg1", "arg2"],
+      expect.objectContaining({ maxBuffer: 50 * 1024 * 1024 }),
       expect.any(Function),
     );
   });
@@ -175,6 +179,7 @@ describe("SheetsAdapter", () => {
           "--format",
           "json",
         ],
+        expect.objectContaining({ maxBuffer: 50 * 1024 * 1024 }),
         expect.any(Function),
       );
     });
@@ -211,6 +216,7 @@ describe("SheetsAdapter", () => {
           "--params",
           JSON.stringify({ spreadsheetId: "id123", range: "'Sheet1'" }),
         ]),
+        expect.objectContaining({ maxBuffer: 50 * 1024 * 1024 }),
         expect.any(Function),
       );
     });
@@ -241,6 +247,7 @@ describe("SheetsAdapter", () => {
           "--format",
           "json",
         ],
+        expect.objectContaining({ maxBuffer: 50 * 1024 * 1024 }),
         expect.any(Function),
       );
     });
@@ -512,6 +519,7 @@ describe("SheetsAdapter", () => {
           "--format",
           "json",
         ],
+        expect.objectContaining({ maxBuffer: 50 * 1024 * 1024 }),
         expect.any(Function),
       );
     });
@@ -641,6 +649,7 @@ describe("SheetsAdapter", () => {
           "--format",
           "json",
         ],
+        expect.objectContaining({ maxBuffer: 50 * 1024 * 1024 }),
         expect.any(Function),
       );
     });
