@@ -2,7 +2,7 @@ import { createServer, } from "node:http";
 import { SheetsAdapter } from "../adapters/sheets/sheets-adapter.js";
 import { runPipeline } from "../core/engine.js";
 import { buildSafeEnv } from "../core/env.js";
-import { reconcile } from "../core/reconcile.js";
+import { cleanupOrphanedRanges, reconcile } from "../core/reconcile.js";
 import { createRunState } from "../core/run-state.js";
 import { createRunTracker } from "../core/run-tracker.js";
 import { safeCompare } from "../core/safe-compare.js";
@@ -35,6 +35,9 @@ async function executePipelineRun(adapter, ref, config, env, signal, sheetId, sh
     const reconciled = await reconcile(adapter, ref, config);
     if (reconciled.configChanged) {
         await adapter.writeConfig(ref, reconciled.config);
+    }
+    if (reconciled.orphanedRanges.length > 0) {
+        await cleanupOrphanedRanges(adapter, ref, reconciled.orphanedRanges);
     }
     const tabConfig = reconciled.tabConfig;
     const resolvedConfig = { ...reconciled.config, actions: tabConfig.actions };

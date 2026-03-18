@@ -1,7 +1,7 @@
 import { SheetsAdapter } from "../adapters/sheets/sheets-adapter.js";
 import { runPipeline } from "../core/engine.js";
 import { buildSafeEnv } from "../core/env.js";
-import { reconcile } from "../core/reconcile.js";
+import { cleanupOrphanedRanges, reconcile } from "../core/reconcile.js";
 import { createRunState } from "../core/run-state.js";
 import { createRunTracker } from "../core/run-tracker.js";
 import { bold, dim, error, success, warn } from "./format.js";
@@ -49,6 +49,9 @@ export function registerRun(program) {
             }
             if (reconciled.configChanged) {
                 await adapter.writeConfig(ref, reconciled.config);
+            }
+            if (reconciled.orphanedRanges.length > 0) {
+                await cleanupOrphanedRanges(adapter, ref, reconciled.orphanedRanges);
             }
             const tabConfig = reconciled.tabConfig;
             if (tabConfig.actions.length === 0) {

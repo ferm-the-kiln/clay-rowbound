@@ -5,7 +5,7 @@ export { type ExecResult, executeCommand, executeExecAction, } from "./core/exec
 export { extractValue } from "./core/extractor.js";
 export { type HttpRequestOptions, type HttpResponse, httpRequest, StopProviderError, } from "./core/http-client.js";
 export { RateLimiter } from "./core/rate-limiter.js";
-export { type ReconcileResult, reconcile, } from "./core/reconcile.js";
+export { cleanupOrphanedRanges, type ReconcileResult, reconcile, } from "./core/reconcile.js";
 export { formatAge, formatDuration, formatRunDetail, formatRunList, } from "./core/run-format.js";
 export { type ActionSummary, createRunState, listRuns, pruneRuns, type RunError, type RunState, readRunState, writeRunState, } from "./core/run-state.js";
 export { createRunTracker } from "./core/run-tracker.js";

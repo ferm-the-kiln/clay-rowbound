@@ -11,6 +11,8 @@ export interface ReconcileResult {
     messages: string[];
     /** Whether the config was modified and needs re-saving */
     configChanged: boolean;
+    /** Named range IDs that should be deleted from the sheet (orphaned by column deletion) */
+    orphanedRanges: string[];
 }
 /**
  * Reconcile a pipeline config with the current sheet state.
@@ -22,3 +24,9 @@ export interface ReconcileResult {
  * 4. Action target migration from column names to IDs
  */
 export declare function reconcile(adapter: SheetsAdapter, ref: SheetRef, config: PipelineConfig): Promise<ReconcileResult>;
+/**
+ * Delete orphaned named ranges from the sheet after config has been saved.
+ * Call this after writeConfig() to ensure consistent state — if range deletion
+ * fails, the config is already correct and the next sync will retry.
+ */
+export declare function cleanupOrphanedRanges(adapter: SheetsAdapter, ref: SheetRef, orphanedRanges: string[]): Promise<void>;
