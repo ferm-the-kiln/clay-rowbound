@@ -69,7 +69,11 @@ export function registerRun(program: Command): void {
             await adapter.writeConfig(ref, reconciled.config);
           }
           if (reconciled.orphanedRanges.length > 0) {
-            await cleanupOrphanedRanges(adapter, ref, reconciled.orphanedRanges);
+            await cleanupOrphanedRanges(
+              adapter,
+              ref,
+              reconciled.orphanedRanges,
+            );
           }
 
           const tabConfig = reconciled.tabConfig;

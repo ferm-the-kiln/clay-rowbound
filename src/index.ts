@@ -22,8 +22,8 @@ export {
 } from "./core/http-client.js";
 export { RateLimiter } from "./core/rate-limiter.js";
 export {
-  type ReconcileResult,
   cleanupOrphanedRanges,
+  type ReconcileResult,
   reconcile,
 } from "./core/reconcile.js";
 export {

@@ -473,9 +473,9 @@ describe("reconcile", () => {
     // reconcile itself does NOT delete ranges (callers do after saving config)
     expect(adapter.deletedRanges).toHaveLength(0);
     // Messages mention orphaned removal
-    expect(
-      result.messages.filter((m) => m.includes("orphaned")),
-    ).toHaveLength(2);
+    expect(result.messages.filter((m) => m.includes("orphaned"))).toHaveLength(
+      2,
+    );
   });
 
   it("handles collision when no range matches the header by old name", async () => {
