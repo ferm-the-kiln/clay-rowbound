@@ -1,25 +1,20 @@
 /**
- * Token bucket rate limiter.
+ * Interval-based rate limiter.
  *
- * Refills tokens based on elapsed time, with max capacity equal to
- * tokensPerSecond. Used globally across all HTTP requests.
+ * Enforces a minimum interval (in milliseconds) between requests.
+ * Serialized via a promise chain to prevent race conditions.
  */
 export declare class RateLimiter {
-    private readonly tokensPerSecond;
-    private tokens;
-    private readonly maxTokens;
-    private lastRefill;
+    private readonly intervalMs;
+    private lastRequest;
     private queue;
-    constructor(tokensPerSecond: number);
+    constructor(intervalMs: number);
     /**
-     * Acquire a single token. Resolves immediately if a token is available,
-     * otherwise waits until one is refilled. Respects AbortSignal for early exit.
-     *
-     * Serialized via a promise chain to prevent race conditions when
-     * multiple callers invoke acquire() concurrently.
+     * Wait until the minimum interval has elapsed since the last request.
+     * The first request always goes through immediately.
+     * Respects AbortSignal for early exit.
      */
     acquire(signal?: AbortSignal): Promise<void>;
     private _acquire;
-    private refill;
     private sleep;
 }

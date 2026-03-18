@@ -102,9 +102,9 @@ export async function runPipeline(options) {
     const { adapter, ref, config, env, range, actionFilter, dryRun = false, signal, } = options;
     // Read all rows from the sheet
     const rows = await adapter.readRows(ref);
-    // Create rate limiter if configured
+    // Create rate limiter if configured (rateLimit = seconds between requests)
     const rateLimiter = config.settings.rateLimit > 0
-        ? new RateLimiter(config.settings.rateLimit)
+        ? new RateLimiter(config.settings.rateLimit * 1000)
         : undefined;
     const retryAttempts = config.settings.retryAttempts ?? 0;
     const retryBackoff = config.settings.retryBackoff;

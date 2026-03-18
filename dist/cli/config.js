@@ -232,7 +232,7 @@ export function registerConfig(program) {
         .description("Update pipeline settings")
         .argument("<sheetId>", "Google Sheets spreadsheet ID")
         .option("--concurrency <n>", "Max concurrent rows")
-        .option("--rate-limit <n>", "Max requests per second")
+        .option("--rate-limit <n>", "Seconds between requests (e.g. 10 = 1 req per 10s, 0.1 = 10 req/s)")
         .option("--retry-attempts <n>", "Number of retry attempts")
         .option("--retry-backoff <strategy>", "Backoff strategy (exponential, linear, fixed)")
         .option("--tab <name>", "Sheet tab name")
@@ -258,9 +258,9 @@ export function registerConfig(program) {
                 changes.push(`concurrency=${val}`);
             }
             if (opts.rateLimit !== undefined) {
-                const val = parseInt(opts.rateLimit, 10);
-                if (Number.isNaN(val) || val <= 0) {
-                    console.error(error("--rate-limit must be a positive integer."));
+                const val = parseFloat(opts.rateLimit);
+                if (Number.isNaN(val) || val < 0) {
+                    console.error(error("--rate-limit must be a non-negative number (0 to disable)."));
                     process.exitCode = 1;
                     return;
                 }
@@ -367,7 +367,7 @@ export function registerConfig(program) {
                     console.log(`  Tab:     ${tabName}`);
                 }
                 console.log(`  Actions: ${actionCount}`);
-                console.log(`  Settings: concurrency=${existing.settings.concurrency}, rateLimit=${existing.settings.rateLimit}/s`);
+                console.log(`  Settings: concurrency=${existing.settings.concurrency}, rateLimit=${existing.settings.rateLimit}s between requests`);
             }
             else {
                 console.error(error("Config validation failed:"));

@@ -81,7 +81,7 @@ export function registerStatus(program) {
             // Settings
             console.log(dim("\nSettings:"));
             console.log(`  Concurrency:   ${config.settings.concurrency}`);
-            console.log(`  Rate limit:    ${config.settings.rateLimit}/s`);
+            console.log(`  Rate limit:    ${config.settings.rateLimit}s between requests`);
             console.log(`  Retry:         ${config.settings.retryAttempts} attempts (${config.settings.retryBackoff})`);
             console.log(`\nData: ${bold(String(rowCount))} rows`);
             if (enrichment.length > 0) {
