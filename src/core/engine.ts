@@ -3,6 +3,7 @@ import { evaluateCondition, preCheckExpression } from "./condition.js";
 import { executeExecAction } from "./exec.js";
 import { extractValue } from "./extractor.js";
 import { httpRequest } from "./http-client.js";
+import { executeLookup } from "./lookup.js";
 import { RateLimiter } from "./rate-limiter.js";
 import {
   type OnMissingCallback,
@@ -16,11 +17,14 @@ import type {
   ExecAction,
   ExecutionContext,
   HttpAction,
+  LookupAction,
   PipelineConfig,
   Row,
   SheetRef,
+  WriteAction,
 } from "./types.js";
 import { executeWaterfall } from "./waterfall.js";
+import { executeWrite } from "./write-action.js";
 
 export interface RunPipelineOptions {
   adapter: Adapter;
@@ -260,6 +264,11 @@ export async function runPipeline(
     updates: 0,
   };
 
+  // Cache for cross-tab reads (lookup actions). Pre-seeded with current tab data
+  // so same-tab lookups are free.
+  const tabDataCache = new Map<string, Row[]>();
+  tabDataCache.set(ref.sheetName || "Sheet1", rows);
+
   // Warn if concurrency > 1 since it's not yet implemented
   if (config.settings.concurrency > 1) {
     console.warn(
@@ -337,6 +346,20 @@ export async function runPipeline(
         } else if (action.type === "exec") {
           value = await executeExecAction(action as ExecAction, context, {
             signal,
+          });
+        } else if (action.type === "lookup") {
+          value = await executeLookup(action as LookupAction, context, {
+            adapter,
+            spreadsheetId: ref.spreadsheetId,
+            tabDataCache,
+            onMissing,
+          });
+        } else if (action.type === "write") {
+          value = await executeWrite(action as WriteAction, context, {
+            adapter,
+            spreadsheetId: ref.spreadsheetId,
+            dryRun,
+            onMissing,
           });
         }
 

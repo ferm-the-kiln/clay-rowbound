@@ -14,6 +14,8 @@ export interface ExecutionContext {
   row: Row;
   env: Record<string, string>;
   results?: Record<string, unknown>;
+  /** Available during write action array expansion: properties of the current array element */
+  item?: Record<string, string>;
 }
 
 /** A single cell update to write back to the sheet */
@@ -81,12 +83,62 @@ export interface ExecAction {
   onError?: OnErrorConfig;
 }
 
+/** Lookup action: reads data from another tab and returns a matched field */
+export interface LookupAction {
+  id: string;
+  type: "lookup";
+  target: string;
+  when?: string;
+  /** Tab name to search in (same spreadsheet) */
+  sourceTab: string;
+  /** Column header in the source tab to match against */
+  matchColumn: string;
+  /** Value template to match (e.g. "{{row.email}}") */
+  matchValue: string;
+  /** Operator for matching (default: "equals") */
+  matchOperator?: "equals" | "contains";
+  /** Column header in the source tab to return */
+  returnColumn: string;
+  /** "first" returns first match; "all" returns all matches as JSON array (default: "first") */
+  matchMode?: "first" | "all";
+}
+
+/** Write action: writes data from the current row to another tab */
+export interface WriteAction {
+  id: string;
+  type: "write";
+  target: string;
+  when?: string;
+  /** Destination tab name (same spreadsheet) */
+  destTab: string;
+  /** Column mappings: { "Dest Header": "{{row.source}}" } */
+  columns: Record<string, string>;
+  /** Write mode (default: "append") */
+  mode?: "append" | "upsert";
+  /** For upsert: how to match existing rows in the destination */
+  upsertMatch?: {
+    /** Column header in destination tab to match on */
+    column: string;
+    /** Template for the value to match (e.g. "{{row.email}}") */
+    value: string;
+  };
+  /** Template resolving to a JSON array (or JSON object when expandPath is set) —
+   *  creates one destination row per element.
+   *  Column values can use {{item}} or {{item.field}} to access element data. */
+  expand?: string;
+  /** JSONPath to extract the array from the expanded value.
+   *  e.g. "$.contacts" extracts the contacts array from {"contacts": [...]} */
+  expandPath?: string;
+}
+
 /** Union of all action types */
 export type Action =
   | HttpAction
   | WaterfallAction
   | TransformAction
-  | ExecAction;
+  | ExecAction
+  | LookupAction
+  | WriteAction;
 
 /** Global pipeline execution settings */
 export interface PipelineSettings {

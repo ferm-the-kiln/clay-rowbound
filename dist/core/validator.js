@@ -3,7 +3,14 @@ import { JSONPath } from "jsonpath-plus";
 /** Maximum recommended config size in bytes (Developer Metadata limit is 30K). */
 const CONFIG_SIZE_WARN = 25_000;
 /** Allowed action types. */
-const VALID_ACTION_TYPES = new Set(["http", "waterfall", "transform", "exec"]);
+const VALID_ACTION_TYPES = new Set([
+    "http",
+    "waterfall",
+    "transform",
+    "exec",
+    "lookup",
+    "write",
+]);
 /** Known retry backoff strategies. */
 const KNOWN_BACKOFF = new Set(["exponential", "linear", "fixed"]);
 /** Standard HTTP methods. */
@@ -21,14 +28,20 @@ const KNOWN_HTTP_METHODS = new Set([
  * Invalid patterns are anything inside {{ }} that does NOT match this form.
  */
 const VALID_TEMPLATE_REGEX = /^\{\{(row|env)\.[^}]+\}\}$/;
+/** Extended regex that also allows {{item.xxx}} (for write action column templates). */
+const VALID_TEMPLATE_REGEX_EXTENDED = /^\{\{(row|env|item)\.[^}]+\}\}$/;
 /**
  * Finds all {{...}} patterns in a string and returns any that are invalid.
+ * When `allowItem` is true, {{item.xxx}} is also accepted (used by write action column values).
  */
-function findInvalidTemplates(value) {
+function findInvalidTemplates(value, allowItem = false) {
     const TEMPLATE_REGEX = /\{\{[^}]*\}\}/g;
+    const validRegex = allowItem
+        ? VALID_TEMPLATE_REGEX_EXTENDED
+        : VALID_TEMPLATE_REGEX;
     const invalid = [];
     for (const match of value.matchAll(TEMPLATE_REGEX)) {
-        if (!VALID_TEMPLATE_REGEX.test(match[0])) {
+        if (!validRegex.test(match[0])) {
             invalid.push(match[0]);
         }
     }
@@ -229,6 +242,99 @@ export function validateConfig(config) {
             // JSONPath validation on extract if present
             if (execAction.extract && !isValidJsonPath(execAction.extract)) {
                 errors.push(`${label}: invalid JSONPath in 'extract': "${execAction.extract}"`);
+            }
+        }
+        else if (action.type === "lookup") {
+            const lookupAction = action;
+            if (!lookupAction.sourceTab) {
+                errors.push(`${label}: lookup action missing 'sourceTab'`);
+            }
+            if (!lookupAction.matchColumn) {
+                errors.push(`${label}: lookup action missing 'matchColumn'`);
+            }
+            if (!lookupAction.matchValue) {
+                errors.push(`${label}: lookup action missing 'matchValue'`);
+            }
+            if (!lookupAction.returnColumn) {
+                errors.push(`${label}: lookup action missing 'returnColumn'`);
+            }
+            if (lookupAction.matchOperator !== undefined &&
+                lookupAction.matchOperator !== "equals" &&
+                lookupAction.matchOperator !== "contains") {
+                errors.push(`${label}: lookup action 'matchOperator' must be "equals" or "contains" (got "${lookupAction.matchOperator}")`);
+            }
+            if (lookupAction.matchMode !== undefined &&
+                lookupAction.matchMode !== "first" &&
+                lookupAction.matchMode !== "all") {
+                errors.push(`${label}: lookup action 'matchMode' must be "first" or "all" (got "${lookupAction.matchMode}")`);
+            }
+            // Template validation in matchValue
+            if (lookupAction.matchValue) {
+                const invalid = findInvalidTemplates(lookupAction.matchValue);
+                for (const t of invalid) {
+                    errors.push(`${label}: invalid template "${t}" in matchValue — must be {{row.x}} or {{env.X}}`);
+                }
+            }
+        }
+        else if (action.type === "write") {
+            const writeAction = action;
+            if (!writeAction.destTab) {
+                errors.push(`${label}: write action missing 'destTab'`);
+            }
+            if (!writeAction.columns ||
+                typeof writeAction.columns !== "object" ||
+                Object.keys(writeAction.columns).length === 0) {
+                errors.push(`${label}: write action must have a non-empty 'columns' object`);
+            }
+            else {
+                // Validate templates in column values (allow {{item.xxx}} for write actions)
+                for (const [destCol, valueTemplate] of Object.entries(writeAction.columns)) {
+                    if (!valueTemplate) {
+                        errors.push(`${label}: write action column "${destCol}" has empty value template`);
+                    }
+                    else {
+                        const invalid = findInvalidTemplates(valueTemplate, true);
+                        for (const t of invalid) {
+                            errors.push(`${label}: invalid template "${t}" in column "${destCol}" — must be {{row.x}}, {{env.X}}, or {{item.x}}`);
+                        }
+                    }
+                }
+            }
+            if (writeAction.mode !== undefined &&
+                writeAction.mode !== "append" &&
+                writeAction.mode !== "upsert") {
+                errors.push(`${label}: write action 'mode' must be "append" or "upsert" (got "${writeAction.mode}")`);
+            }
+            if (writeAction.mode === "upsert") {
+                if (!writeAction.upsertMatch?.column) {
+                    errors.push(`${label}: upsert mode requires 'upsertMatch.column'`);
+                }
+                if (!writeAction.upsertMatch?.value) {
+                    errors.push(`${label}: upsert mode requires 'upsertMatch.value'`);
+                }
+                // Validate template in upsertMatch.value
+                if (writeAction.upsertMatch?.value) {
+                    const invalid = findInvalidTemplates(writeAction.upsertMatch.value);
+                    for (const t of invalid) {
+                        errors.push(`${label}: invalid template "${t}" in upsertMatch.value`);
+                    }
+                }
+            }
+            // Validate expand template if present
+            if (writeAction.expand) {
+                const invalid = findInvalidTemplates(writeAction.expand);
+                for (const t of invalid) {
+                    errors.push(`${label}: invalid template "${t}" in expand — must be {{row.x}} or {{env.X}}`);
+                }
+            }
+            // Validate expandPath JSONPath if present
+            if (writeAction.expandPath) {
+                if (!writeAction.expand) {
+                    errors.push(`${label}: 'expandPath' requires 'expand' to be set`);
+                }
+                if (!isValidJsonPath(writeAction.expandPath)) {
+                    errors.push(`${label}: invalid JSONPath in 'expandPath': "${writeAction.expandPath}"`);
+                }
             }
         }
     }

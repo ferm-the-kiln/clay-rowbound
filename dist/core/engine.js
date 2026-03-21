@@ -3,9 +3,11 @@ import { evaluateCondition, preCheckExpression } from "./condition.js";
 import { executeExecAction } from "./exec.js";
 import { extractValue } from "./extractor.js";
 import { httpRequest } from "./http-client.js";
+import { executeLookup } from "./lookup.js";
 import { RateLimiter } from "./rate-limiter.js";
 import { resolveObject, resolveTemplate, } from "./template.js";
 import { executeWaterfall } from "./waterfall.js";
+import { executeWrite } from "./write-action.js";
 /**
  * Evaluate a JavaScript expression in a sandboxed context, returning the result as a string.
  *
@@ -148,6 +150,10 @@ export async function runPipeline(options) {
         errors: [],
         updates: 0,
     };
+    // Cache for cross-tab reads (lookup actions). Pre-seeded with current tab data
+    // so same-tab lookups are free.
+    const tabDataCache = new Map();
+    tabDataCache.set(ref.sheetName || "Sheet1", rows);
     // Warn if concurrency > 1 since it's not yet implemented
     if (config.settings.concurrency > 1) {
         console.warn(`Warning: concurrency is set to ${config.settings.concurrency} but parallel row processing is not yet implemented. All rows will be processed sequentially (concurrency=1).`);
@@ -210,6 +216,22 @@ export async function runPipeline(options) {
                 else if (action.type === "exec") {
                     value = await executeExecAction(action, context, {
                         signal,
+                    });
+                }
+                else if (action.type === "lookup") {
+                    value = await executeLookup(action, context, {
+                        adapter,
+                        spreadsheetId: ref.spreadsheetId,
+                        tabDataCache,
+                        onMissing,
+                    });
+                }
+                else if (action.type === "write") {
+                    value = await executeWrite(action, context, {
+                        adapter,
+                        spreadsheetId: ref.spreadsheetId,
+                        dryRun,
+                        onMissing,
                     });
                 }
                 if (value !== null) {

@@ -20,6 +20,7 @@ export {
   httpRequest,
   StopProviderError,
 } from "./core/http-client.js";
+export { executeLookup, type LookupOptions } from "./core/lookup.js";
 export { RateLimiter } from "./core/rate-limiter.js";
 export {
   cleanupOrphanedRanges,
@@ -50,6 +51,7 @@ export type {
   CellUpdate,
   ExecAction,
   HttpAction,
+  LookupAction,
   OnErrorConfig,
   PipelineConfig,
   PipelineSettings,
@@ -59,6 +61,7 @@ export type {
   TransformAction,
   WaterfallAction,
   WaterfallProvider,
+  WriteAction,
 } from "./core/types.js";
 export {
   type ValidationResult,
@@ -68,3 +71,4 @@ export {
   executeWaterfall,
   type WaterfallResult,
 } from "./core/waterfall.js";
+export { executeWrite, type WriteOptions } from "./core/write-action.js";

@@ -70,7 +70,7 @@ const actionConfigSchema = z
     .object({
     id: z.string().describe("Unique action identifier"),
     type: z
-        .enum(["http", "transform", "exec", "waterfall"])
+        .enum(["http", "transform", "exec", "waterfall", "lookup", "write"])
         .describe("Action type"),
     target: z.string().describe("Target column to write results to"),
     when: z
@@ -96,6 +96,53 @@ const actionConfigSchema = z
         .record(z.string(), z.any())
         .optional()
         .describe("Error handling configuration"),
+    // Lookup action fields
+    sourceTab: z.string().optional().describe("Tab name to look up data from"),
+    matchColumn: z
+        .string()
+        .optional()
+        .describe("Column in source tab to match against"),
+    matchValue: z
+        .string()
+        .optional()
+        .describe("Template for value to match (e.g. '{{row.email}}')"),
+    matchOperator: z
+        .enum(["equals", "contains"])
+        .optional()
+        .describe("Match operator (default: equals)"),
+    returnColumn: z
+        .string()
+        .optional()
+        .describe("Column in source tab to return"),
+    matchMode: z
+        .enum(["first", "all"])
+        .optional()
+        .describe("Return first match or all matches as JSON array"),
+    // Write action fields
+    destTab: z.string().optional().describe("Destination tab name to write to"),
+    columns: z
+        .record(z.string(), z.string())
+        .optional()
+        .describe("Column mappings for write action: { destHeader: valueTemplate }"),
+    mode: z
+        .enum(["append", "upsert"])
+        .optional()
+        .describe("Write mode (default: append)"),
+    upsertMatch: z
+        .object({
+        column: z.string().describe("Column in destination tab to match on"),
+        value: z.string().describe("Template for the upsert match value"),
+    })
+        .optional()
+        .describe("Upsert match configuration"),
+    expand: z
+        .string()
+        .optional()
+        .describe("Template resolving to JSON array (or object when expandPath is set) — creates one dest row per element"),
+    expandPath: z
+        .string()
+        .optional()
+        .describe("JSONPath to extract the array from the expanded value (e.g. '$.contacts')"),
 })
     .passthrough();
 const actionPatchSchema = z
@@ -105,7 +152,7 @@ const actionPatchSchema = z
         .optional()
         .describe("New action identifier (renames the action)"),
     type: z
-        .enum(["http", "transform", "exec", "waterfall"])
+        .enum(["http", "transform", "exec", "waterfall", "lookup", "write"])
         .optional()
         .describe("Action type"),
     target: z.string().optional().describe("Target column to write results to"),
@@ -132,6 +179,29 @@ const actionPatchSchema = z
         .record(z.string(), z.any())
         .optional()
         .describe("Error handling configuration"),
+    sourceTab: z.string().optional().describe("Tab name to look up data from"),
+    matchColumn: z
+        .string()
+        .optional()
+        .describe("Column in source tab to match against"),
+    matchValue: z.string().optional().describe("Template for value to match"),
+    matchOperator: z.enum(["equals", "contains"]).optional(),
+    returnColumn: z
+        .string()
+        .optional()
+        .describe("Column in source tab to return"),
+    matchMode: z.enum(["first", "all"]).optional(),
+    destTab: z.string().optional().describe("Destination tab name to write to"),
+    columns: z.record(z.string(), z.string()).optional(),
+    mode: z.enum(["append", "upsert"]).optional(),
+    upsertMatch: z
+        .object({
+        column: z.string(),
+        value: z.string(),
+    })
+        .optional(),
+    expand: z.string().optional(),
+    expandPath: z.string().optional(),
 })
     .passthrough();
 // ---------------------------------------------------------------------------

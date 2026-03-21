@@ -6,7 +6,7 @@
  * resolves to `undefined` in the given context.
  */
 export function resolveTemplate(template, context, onMissing) {
-    const TEMPLATE_REGEX = /\{\{(row|env)\.([^}]+)\}\}/g;
+    const TEMPLATE_REGEX = /\{\{(row|env|item)\.([^}]+)\}\}/g;
     return template.replace(TEMPLATE_REGEX, (_match, source, key) => {
         if (source === "row") {
             const value = context.row[key];
@@ -17,6 +17,13 @@ export function resolveTemplate(template, context, onMissing) {
         }
         if (source === "env") {
             const value = context.env[key];
+            if (value === undefined && onMissing) {
+                onMissing(source, key);
+            }
+            return value ?? "";
+        }
+        if (source === "item") {
+            const value = context.item?.[key];
             if (value === undefined && onMissing) {
                 onMissing(source, key);
             }
@@ -34,7 +41,7 @@ export function resolveTemplate(template, context, onMissing) {
  * NOT to static parts of the template.
  */
 export function resolveTemplateEscaped(template, context, escapeFn, onMissing) {
-    const TEMPLATE_REGEX = /\{\{(row|env)\.([^}]+)\}\}/g;
+    const TEMPLATE_REGEX = /\{\{(row|env|item)\.([^}]+)\}\}/g;
     return template.replace(TEMPLATE_REGEX, (_match, source, key) => {
         let value;
         if (source === "row") {
@@ -42,6 +49,9 @@ export function resolveTemplateEscaped(template, context, escapeFn, onMissing) {
         }
         else if (source === "env") {
             value = context.env[key];
+        }
+        else if (source === "item") {
+            value = context.item?.[key];
         }
         if (value === undefined && onMissing) {
             onMissing(source, key);

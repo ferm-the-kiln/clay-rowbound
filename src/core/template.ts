@@ -19,7 +19,7 @@ export function resolveTemplate(
   context: ExecutionContext,
   onMissing?: OnMissingCallback,
 ): string {
-  const TEMPLATE_REGEX = /\{\{(row|env)\.([^}]+)\}\}/g;
+  const TEMPLATE_REGEX = /\{\{(row|env|item)\.([^}]+)\}\}/g;
   return template.replace(
     TEMPLATE_REGEX,
     (_match, source: string, key: string) => {
@@ -32,6 +32,13 @@ export function resolveTemplate(
       }
       if (source === "env") {
         const value = context.env[key];
+        if (value === undefined && onMissing) {
+          onMissing(source, key);
+        }
+        return value ?? "";
+      }
+      if (source === "item") {
+        const value = context.item?.[key];
         if (value === undefined && onMissing) {
           onMissing(source, key);
         }
@@ -56,7 +63,7 @@ export function resolveTemplateEscaped(
   escapeFn: (value: string) => string,
   onMissing?: OnMissingCallback,
 ): string {
-  const TEMPLATE_REGEX = /\{\{(row|env)\.([^}]+)\}\}/g;
+  const TEMPLATE_REGEX = /\{\{(row|env|item)\.([^}]+)\}\}/g;
   return template.replace(
     TEMPLATE_REGEX,
     (_match, source: string, key: string) => {
@@ -65,6 +72,8 @@ export function resolveTemplateEscaped(
         value = context.row[key];
       } else if (source === "env") {
         value = context.env[key];
+      } else if (source === "item") {
+        value = context.item?.[key];
       }
       if (value === undefined && onMissing) {
         onMissing(source, key);
