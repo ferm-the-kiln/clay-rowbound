@@ -131,7 +131,10 @@ export function registerRun(program: Command): void {
           const resolvedConfig = {
             ...reconciled.config,
             actions: tabConfig.actions,
-            settings: { ...reconciled.config.settings, ...(tabConfig.settings || {}) },
+            settings: {
+              ...reconciled.config.settings,
+              ...(tabConfig.settings || {}),
+            },
           };
 
           // Convert CLI row format to engine format

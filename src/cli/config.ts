@@ -347,7 +347,9 @@ export function registerConfig(program: Command): void {
           // Handle --enabled / --disabled for per-tab enabled flag
           if (opts.enabled || opts.disabled) {
             if (opts.enabled && opts.disabled) {
-              console.error(error("Cannot specify both --enabled and --disabled."));
+              console.error(
+                error("Cannot specify both --enabled and --disabled."),
+              );
               process.exitCode = 1;
               return;
             }
@@ -357,7 +359,11 @@ export function registerConfig(program: Command): void {
               existing.tabs[gid] = tab;
               changes.push(`enabled=${tab.enabled}`);
             } else {
-              console.error(error("--enabled/--disabled requires a v2 config with tabs. Run 'rowbound sync' first."));
+              console.error(
+                error(
+                  "--enabled/--disabled requires a v2 config with tabs. Run 'rowbound sync' first.",
+                ),
+              );
               process.exitCode = 1;
               return;
             }
@@ -380,7 +386,11 @@ export function registerConfig(program: Command): void {
             }
             if (useTabSettings && tabGid && existing.tabs) {
               const tab = existing.tabs[tabGid]!;
-              tab.settings = { ...existing.settings, ...(tab.settings || {}), concurrency: val };
+              tab.settings = {
+                ...existing.settings,
+                ...(tab.settings || {}),
+                concurrency: val,
+              };
               changes.push(`concurrency=${val} (tab)`);
             } else {
               existing.settings.concurrency = val;
@@ -401,7 +411,11 @@ export function registerConfig(program: Command): void {
             }
             if (useTabSettings && tabGid && existing.tabs) {
               const tab = existing.tabs[tabGid]!;
-              tab.settings = { ...existing.settings, ...(tab.settings || {}), rateLimit: val };
+              tab.settings = {
+                ...existing.settings,
+                ...(tab.settings || {}),
+                rateLimit: val,
+              };
               changes.push(`rateLimit=${val} (tab)`);
             } else {
               existing.settings.rateLimit = val;
@@ -420,7 +434,11 @@ export function registerConfig(program: Command): void {
             }
             if (useTabSettings && tabGid && existing.tabs) {
               const tab = existing.tabs[tabGid]!;
-              tab.settings = { ...existing.settings, ...(tab.settings || {}), retryAttempts: val };
+              tab.settings = {
+                ...existing.settings,
+                ...(tab.settings || {}),
+                retryAttempts: val,
+              };
               changes.push(`retryAttempts=${val} (tab)`);
             } else {
               existing.settings.retryAttempts = val;
@@ -441,7 +459,11 @@ export function registerConfig(program: Command): void {
             }
             if (useTabSettings && tabGid && existing.tabs) {
               const tab = existing.tabs[tabGid]!;
-              tab.settings = { ...existing.settings, ...(tab.settings || {}), retryBackoff: opts.retryBackoff };
+              tab.settings = {
+                ...existing.settings,
+                ...(tab.settings || {}),
+                retryBackoff: opts.retryBackoff,
+              };
               changes.push(`retryBackoff=${opts.retryBackoff} (tab)`);
             } else {
               existing.settings.retryBackoff = opts.retryBackoff;

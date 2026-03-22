@@ -206,9 +206,13 @@ export function registerWatch(program: Command): void {
             // Check if tab is disabled
             if (activeConfig.tabs) {
               const tabEntries = Object.entries(activeConfig.tabs);
-              const matchingTab = tabEntries.find(([_, t]) => t.name === opts.tab);
+              const matchingTab = tabEntries.find(
+                ([_, t]) => t.name === opts.tab,
+              );
               if (matchingTab && matchingTab[1].enabled === false) {
-                console.log(`[${timestamp()}] Tab "${opts.tab}" is disabled, skipping run.`);
+                console.log(
+                  `[${timestamp()}] Tab "${opts.tab}" is disabled, skipping run.`,
+                );
                 return null;
               }
             }
@@ -228,7 +232,9 @@ export function registerWatch(program: Command): void {
                 try {
                   const cfg = await adapter.readConfig(ref);
                   if (!cfg?.tabs) return true;
-                  const tabEntry = Object.entries(cfg.tabs).find(([_, t]) => t.name === opts.tab);
+                  const tabEntry = Object.entries(cfg.tabs).find(
+                    ([_, t]) => t.name === opts.tab,
+                  );
                   return tabEntry ? tabEntry[1].enabled !== false : true;
                 } catch {
                   return true;
