@@ -155,48 +155,38 @@ export async function executeAiAction(
     const stdout = result.stdout.trim();
     if (!stdout) return [];
 
-    // If outputs are defined, parse JSON and map to columns
+    // If outputs are defined, extract the JSON object and write it to the
+    // target column as a JSON string. Output fields/schema define the structure
+    // but all data goes into the single target column cell.
     if (action.outputs && Object.keys(action.outputs).length > 0) {
-      let parsed: Record<string, unknown>;
+      let jsonStr: string;
       try {
-        // Try direct JSON parse first (most reliable), then fall back to regex
+        // Try direct JSON parse to validate, then store as string
         try {
-          parsed = JSON.parse(stdout.trim());
+          const parsed = JSON.parse(stdout.trim());
+          jsonStr = JSON.stringify(parsed);
         } catch {
           // Fall back to extracting first balanced JSON object from wrapped output
-          const jsonMatch = stdout.match(/\{[\s\S]*?\}/);
+          const jsonMatch = stdout.match(/\{[\s\S]*\}/);
           if (!jsonMatch) {
             throw new Error("No JSON object found in output");
           }
-          parsed = JSON.parse(jsonMatch[0]);
+          const parsed = JSON.parse(jsonMatch[0]);
+          jsonStr = JSON.stringify(parsed);
         }
       } catch {
-        // Fallback: write raw output to primary target column
-        const columnName = options.columnMap?.[action.target] ?? action.target;
-        return [
-          {
-            row: options.rowIndex + 2,
-            column: columnName,
-            value: stdout,
-          },
-        ];
+        // Fallback: write raw output to target column
+        jsonStr = stdout;
       }
 
-      const updates: CellUpdate[] = [];
-      for (const [fieldName] of Object.entries(action.outputs)) {
-        const val = parsed[fieldName];
-        if (val !== undefined && val !== null) {
-          const strVal =
-            typeof val === "object" ? JSON.stringify(val) : String(val);
-          const columnName = options.columnMap?.[fieldName] ?? fieldName;
-          updates.push({
-            row: options.rowIndex + 2,
-            column: columnName,
-            value: strVal,
-          });
-        }
-      }
-      return updates;
+      const columnName = options.columnMap?.[action.target] ?? action.target;
+      return [
+        {
+          row: options.rowIndex + 2,
+          column: columnName,
+          value: jsonStr,
+        },
+      ];
     }
 
     // Single-output mode: write to target column

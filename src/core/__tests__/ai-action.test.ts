@@ -74,7 +74,7 @@ describe("executeAiAction", () => {
     );
   });
 
-  it("handles multi-column outputs from structured JSON", async () => {
+  it("writes structured JSON output to single target column", async () => {
     const multiAction: AiAction = {
       ...baseAction,
       outputs: {
@@ -84,12 +84,14 @@ describe("executeAiAction", () => {
       },
     };
 
+    const jsonOutput = {
+      summary: "A tech company",
+      is_b2b: true,
+      industry: "Technology",
+    };
+
     mockExecuteCommand.mockResolvedValue({
-      stdout: JSON.stringify({
-        summary: "A tech company",
-        is_b2b: true,
-        industry: "Technology",
-      }),
+      stdout: JSON.stringify(jsonOutput),
       stderr: "",
       exitCode: 0,
     });
@@ -98,14 +100,12 @@ describe("executeAiAction", () => {
       rowIndex: 0,
     });
 
-    expect(updates).toHaveLength(3);
-    expect(updates).toEqual(
-      expect.arrayContaining([
-        { row: 2, column: "summary", value: "A tech company" },
-        { row: 2, column: "is_b2b", value: "true" },
-        { row: 2, column: "industry", value: "Technology" },
-      ]),
-    );
+    expect(updates).toHaveLength(1);
+    expect(updates[0]).toEqual({
+      row: 2,
+      column: "summary",
+      value: JSON.stringify(jsonOutput),
+    });
   });
 
   it("falls back to raw output when JSON parsing fails for multi-column", async () => {
@@ -241,7 +241,7 @@ describe("executeAiAction", () => {
     expect(updates[0]!.column).toBe("AI Summary");
   });
 
-  it("extracts JSON from markdown-wrapped output", async () => {
+  it("extracts JSON from markdown-wrapped output into target column", async () => {
     const multiAction: AiAction = {
       ...baseAction,
       outputs: { answer: { type: "text" } },
@@ -258,6 +258,7 @@ describe("executeAiAction", () => {
     });
 
     expect(updates).toHaveLength(1);
-    expect(updates[0]!.value).toBe("42");
+    expect(updates[0]!.column).toBe("summary");
+    expect(updates[0]!.value).toBe('{"answer":"42"}');
   });
 });

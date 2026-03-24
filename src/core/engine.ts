@@ -325,23 +325,8 @@ export async function runPipeline(
       if (signal?.aborted) break;
 
       try {
-        // Skip if target cell already has a value (for multi-output AI
-        // actions, skip only if ALL target columns are filled)
-        if (action.type === "ai" && (action as AiAction).outputs) {
-          const outputs = (action as AiAction).outputs!;
-          // Check all output columns AND the primary target column
-          const columnsToCheck = [...Object.keys(outputs), action.target];
-          const allFilled = columnsToCheck.every(
-            (col) => row[col] !== undefined && row[col] !== "",
-          );
-          if (allFilled) {
-            options.onActionComplete?.(i, action.id, null);
-            continue;
-          }
-        } else if (
-          row[action.target] !== undefined &&
-          row[action.target] !== ""
-        ) {
+        // Skip if target cell already has a value
+        if (row[action.target] !== undefined && row[action.target] !== "") {
           options.onActionComplete?.(i, action.id, null);
           continue;
         }
@@ -419,33 +404,13 @@ export async function runPipeline(
             onError: sa.onError,
           });
         } else if (action.type === "ai") {
-          // AI action returns CellUpdate[] directly (multi-column capable)
+          // AI action writes output (possibly JSON) to the single target column
           const aiUpdates = await executeAiAction(action as AiAction, context, {
             signal,
             rowIndex: i,
             columnMap: options.columnMap,
           });
-
-          // Update in-memory row for all AI output columns
-          for (const upd of aiUpdates) {
-            row[upd.column] = upd.value;
-            // Also set by ID if columnMap maps to this column name
-            if (options.columnMap) {
-              for (const [id, name] of Object.entries(options.columnMap)) {
-                if (name === upd.column) row[id] = upd.value;
-              }
-            }
-          }
-
-          rowUpdates.push(...aiUpdates);
-          options.onActionComplete?.(
-            i,
-            action.id,
-            aiUpdates.length > 0
-              ? aiUpdates.map((u) => u.value).join("; ")
-              : null,
-          );
-          continue; // Skip the single-value handling below
+          value = aiUpdates.length > 0 ? aiUpdates[0]!.value : null;
         }
 
         if (value !== null) {
