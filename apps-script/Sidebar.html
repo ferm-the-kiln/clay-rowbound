@@ -962,8 +962,17 @@ function renderSourceEditorContent() {
     h += field('Timeout (ms)', '<input class="field-input" type="number" name="src_timeout" value="' + esc(s.timeout || 30000) + '">');
     h += '</div>';
   } else if (s.type === 'script') {
+    // Look up the inline code from the named script definition
+    var scriptDef = (s.script && getScripts()[s.script]) || {};
+    var srcScriptRuntime = scriptDef.runtime || s._script_runtime || 'python3';
+    var srcScriptCode = scriptDef.code || s._script_code || '';
+
     h += '<div class="section"><div class="section-title">Script</div>';
-    h += field('Script Name', buildScriptSelect('src_script', s.script), 'Select a script defined in the Scripts section');
+    h += field('Runtime', '<select class="field-select" name="src_script_runtime">' +
+      '<option value="python3"' + (srcScriptRuntime === 'python3' ? ' selected' : '') + '>Python 3</option>' +
+      '<option value="bash"' + (srcScriptRuntime === 'bash' ? ' selected' : '') + '>Bash</option>' +
+      '<option value="node"' + (srcScriptRuntime === 'node' ? ' selected' : '') + '>Node.js</option></select>');
+    h += field('Code', '<textarea class="field-textarea" name="src_script_code" rows="12" style="font-family:monospace;font-size:12px" placeholder="#!/usr/bin/env python3\nimport json\n...">' + esc(srcScriptCode) + '</textarea>');
     h += '</div>';
     h += '<div class="section"><div class="section-title">Arguments</div>';
     h += buildArgsList('src_args', s.args);
@@ -1069,7 +1078,7 @@ function onSourceTypeChange(newType) {
   s.type = newType;
   delete s.method; delete s.url; delete s.headers; delete s.body;
   delete s.extract; delete s.extractPath; delete s.command; delete s.timeout;
-  delete s.script; delete s.args;
+  delete s.script; delete s.args; delete s._script_runtime; delete s._script_code;
   s.columns = readKvList('src_columns');
   s.dedup = getVal('src_dedup') || undefined;
   s.updateExisting = getVal('src_updateExisting') === 'true';
@@ -1078,7 +1087,7 @@ function onSourceTypeChange(newType) {
   delete s._ai_outputFormat; delete s._ai_outputFields; delete s._ai_outputSchema;
   if (newType === 'http') { s.method = 'POST'; s.url = ''; s.extract = '$'; }
   if (newType === 'exec') { s.command = ''; }
-  if (newType === 'script') { s.script = ''; s.args = []; }
+  if (newType === 'script') { s.script = ''; s.args = []; s._script_runtime = 'python3'; s._script_code = ''; }
   if (newType === 'ai') { s._ai_runtime = 'claude'; s._ai_prompt = ''; s._ai_outputFormat = 'fields'; }
   renderSourceEditorContent();
 }
@@ -1104,7 +1113,17 @@ function readFormSource() {
     var timeout = parseInt(getVal('src_timeout'));
     if (timeout && timeout !== 30000) s.timeout = timeout;
   } else if (type === 'script') {
-    s.script = getVal('src_script');
+    // Save the code as a named script (using source ID as the script name)
+    var srcRuntime = getVal('src_script_runtime') || 'python3';
+    var srcCode = getVal('src_script_code') || '';
+    var scriptName = s.id;
+    var scripts = getScripts();
+    scripts[scriptName] = { runtime: srcRuntime, code: srcCode };
+    setScripts(scripts);
+    s.script = scriptName;
+    // Store inline for re-editing if script lookup fails
+    s._script_runtime = srcRuntime;
+    s._script_code = srcCode;
     var sArgs = readArgsList('src_args');
     if (sArgs.length > 0) s.args = sArgs;
     var sExt = getVal('src_extract').trim();
