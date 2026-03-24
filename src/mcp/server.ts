@@ -99,6 +99,7 @@ const actionConfigSchema = z
         "lookup",
         "write",
         "script",
+        "ai",
       ])
       .describe("Action type"),
     target: z.string().describe("Target column to write results to"),
@@ -187,6 +188,28 @@ const actionConfigSchema = z
       .array(z.string())
       .optional()
       .describe("Arguments passed to the script"),
+    // AI action fields
+    runtime: z
+      .enum(["claude", "codex"])
+      .optional()
+      .describe("AI runtime: 'claude' uses claude -p, 'codex' uses codex exec"),
+    prompt: z
+      .string()
+      .optional()
+      .describe(
+        "Prompt template for AI actions. Supports {{row.x}} references.",
+      ),
+    outputs: z
+      .record(
+        z.string(),
+        z.object({ type: z.enum(["text", "number", "boolean"]) }),
+      )
+      .optional()
+      .describe("Named output fields for AI multi-column output"),
+    outputFormat: z
+      .enum(["fields", "json"])
+      .optional()
+      .describe("AI output format: fields (named) or json (raw schema)"),
   })
   .passthrough();
 
@@ -205,6 +228,7 @@ const actionPatchSchema = z
         "lookup",
         "write",
         "script",
+        "ai",
       ])
       .optional()
       .describe("Action type"),

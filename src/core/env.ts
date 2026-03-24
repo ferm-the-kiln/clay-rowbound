@@ -26,9 +26,11 @@ export function buildSafeEnv(config?: PipelineConfig): Record<string, string> {
     env.NODE_ENV = process.env.NODE_ENV;
   }
 
-  // 3. PATH so child processes can find executables
-  if (process.env.PATH !== undefined) {
-    env.PATH = process.env.PATH;
+  // 3. Essential system vars so child processes can find executables and configs
+  for (const key of ["PATH", "HOME", "USER", "SHELL"]) {
+    if (process.env[key] !== undefined) {
+      env[key] = process.env[key]!;
+    }
   }
 
   // 4. Scan config templates for {{env.X}} references

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { evaluateCondition, preCheckExpression } from "../condition.js";
 
 describe("evaluateCondition", () => {
@@ -59,12 +59,19 @@ describe("evaluateCondition", () => {
     ).toBe(true);
   });
 
-  it("returns false on syntax errors", () => {
-    expect(evaluateCondition("not valid js !!!", context)).toBe(false);
+  it("throws on syntax errors instead of silently returning false", () => {
+    expect(() => evaluateCondition("not valid js !!!", context)).toThrow(
+      /Condition evaluation failed/,
+    );
   });
 
-  it("returns false on timeout (infinite loop)", () => {
+  it("returns false with warning on timeout (infinite loop)", () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
     expect(evaluateCondition("while(true) {}", context)).toBe(false);
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining("threw at runtime"),
+    );
+    warnSpy.mockRestore();
   }, 5000);
 
   it("returns false for empty row check on missing field", () => {

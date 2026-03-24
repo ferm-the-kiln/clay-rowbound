@@ -1,2 +1,0 @@
-// Rowbound Core Types
-export {};

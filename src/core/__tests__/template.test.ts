@@ -42,6 +42,20 @@ describe("resolveTemplate", () => {
     expect(resolveTemplate("{{env.MISSING}}", context)).toBe("");
   });
 
+  it("resolves {{x}} shorthand as row variable", () => {
+    expect(resolveTemplate("Hello {{name}}", context)).toBe("Hello Alice");
+  });
+
+  it("resolves mixed shorthand and prefixed placeholders", () => {
+    expect(
+      resolveTemplate("{{name}} key={{env.API_KEY}}", context),
+    ).toBe("Alice key=sk-123");
+  });
+
+  it("returns empty string for missing shorthand variables", () => {
+    expect(resolveTemplate("{{missing}}", context)).toBe("");
+  });
+
   it("leaves plain strings unchanged", () => {
     expect(resolveTemplate("no placeholders here", context)).toBe(
       "no placeholders here",
@@ -93,6 +107,12 @@ describe("resolveTemplateEscaped", () => {
     expect(
       resolveTemplateEscaped("echo {{row.missing}}", context, mockEscape),
     ).toBe("echo []");
+  });
+
+  it("applies escape function to shorthand variables", () => {
+    expect(
+      resolveTemplateEscaped("echo {{name}}", context, mockEscape),
+    ).toBe("echo [Alice]");
   });
 });
 

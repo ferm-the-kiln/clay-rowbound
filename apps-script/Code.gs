@@ -13,10 +13,7 @@
 function onOpen() {
   SpreadsheetApp.getUi()
     .createMenu('Rowbound')
-    .addItem('Actions', 'openOverview')
-    .addItem('Sources', 'openSources')
-    .addItem('Scripts', 'openScripts')
-    .addItem('Settings', 'openPipelineSettings')
+    .addItem('Open Rowbound', 'openOverview')
     .addToUi();
 }
 
@@ -50,7 +47,7 @@ function openPipelineSettings() {
 function openSidebar_() {
   var html = HtmlService.createHtmlOutputFromFile('Sidebar')
     .setTitle('Rowbound')
-    .setWidth(360);
+    .setWidth(400);
   SpreadsheetApp.getUi().showSidebar(html);
 }
 
@@ -100,9 +97,19 @@ function getTabHeaders(tabName) {
 
 // ── Config read/write via Developer Metadata ────────────────────────────────
 
-/** Reads the rowbound_config from Developer Metadata. Returns null if none. */
+/** Reads the rowbound_config from Developer Metadata with CacheService layer.
+ *  Cache hit is ~10ms vs ~1-3s for the Developer Metadata REST call. */
 function loadConfig() {
   var ssId = SpreadsheetApp.getActiveSpreadsheet().getId();
+  var cacheKey = 'rb_config_' + ssId;
+  var cache = CacheService.getUserCache();
+
+  // Try cache first (5-minute TTL, invalidated by saveConfig)
+  var cached = cache.get(cacheKey);
+  if (cached) {
+    try { return JSON.parse(cached); } catch (e) { /* fall through to API */ }
+  }
+
   try {
     var result = Sheets.Spreadsheets.DeveloperMetadata.search({
       dataFilters: [{
@@ -114,9 +121,10 @@ function loadConfig() {
         result.matchedDeveloperMetadata.length === 0) {
       return null;
     }
-    return JSON.parse(
-      result.matchedDeveloperMetadata[0].developerMetadata.metadataValue
-    );
+    var configStr = result.matchedDeveloperMetadata[0].developerMetadata.metadataValue;
+    // Cache for 5 minutes (300 seconds)
+    cache.put(cacheKey, configStr, 300);
+    return JSON.parse(configStr);
   } catch (e) {
     Logger.log('loadConfig error: ' + e.message);
     return null;
@@ -144,6 +152,10 @@ function saveConfig(configJson) {
         .developerMetadata.metadataId;
     }
   } catch (e) { /* no existing config */ }
+
+  // Invalidate cache so next load is fresh
+  var cacheKey = 'rb_config_' + ssId;
+  CacheService.getUserCache().remove(cacheKey);
 
   if (existingId !== null) {
     Sheets.Spreadsheets.batchUpdate({

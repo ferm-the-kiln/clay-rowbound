@@ -752,11 +752,16 @@ describe("Integration: full pipeline without mocking core modules", () => {
       expect(result.errors).toHaveLength(0);
 
       const updates = adapter.writtenBatches[0]!.updates;
-      expect(updates).toEqual([
-        { row: 2, column: "company_name", value: "Acme Corp" },
-        { row: 2, column: "upper_company", value: "ACME CORP" },
-        { row: 2, column: "email", value: "contact@acme.com" },
-      ]);
+      // Dependency sort may reorder actions (email has no deps, upper_company
+      // depends on company_name) — check values regardless of order
+      expect(updates).toHaveLength(3);
+      expect(updates).toEqual(
+        expect.arrayContaining([
+          { row: 2, column: "company_name", value: "Acme Corp" },
+          { row: 2, column: "upper_company", value: "ACME CORP" },
+          { row: 2, column: "email", value: "contact@acme.com" },
+        ]),
+      );
     });
   });
 

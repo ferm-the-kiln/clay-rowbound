@@ -2,6 +2,8 @@
 // Re-exports for programmatic usage
 
 export { SheetsAdapter } from "./adapters/sheets/sheets-adapter.js";
+export { sortActionsByDependency } from "./core/action-deps.js";
+export { executeAiAction } from "./core/ai.js";
 export { flattenItem, forceText } from "./core/cell-utils.js";
 export { evaluateCondition } from "./core/condition.js";
 export {
@@ -64,10 +66,19 @@ export {
   type ScheduleState,
   updateScheduleEntry,
 } from "./core/source-schedule.js";
+export {
+  type CellStatus,
+  StatusAccumulator,
+} from "./core/status-sheet.js";
 export { resolveObject, resolveTemplate } from "./core/template.js";
 export type {
   Action,
+  ActionRateLimit,
+  ActionRetry,
+  ActionRunSettings,
   Adapter,
+  AiAction,
+  AiOutputField,
   CellUpdate,
   ExecAction,
   ExecSource,

@@ -52,6 +52,7 @@ export interface HttpAction {
   body?: unknown;
   extract: string;
   onError?: OnErrorConfig;
+  runSettings?: ActionRunSettings;
 }
 
 /** A single provider in a waterfall action */
@@ -72,6 +73,7 @@ export interface WaterfallAction {
   target: string;
   when?: string;
   providers: WaterfallProvider[];
+  runSettings?: ActionRunSettings;
 }
 
 /** Transform action: computes a value from existing data */
@@ -93,6 +95,7 @@ export interface ExecAction {
   extract?: string;
   timeout?: number;
   onError?: OnErrorConfig;
+  runSettings?: ActionRunSettings;
 }
 
 /** Lookup action: reads data from another tab and returns a matched field */
@@ -245,6 +248,34 @@ export interface ScriptAction {
   extract?: string;
   timeout?: number;
   onError?: OnErrorConfig;
+  runSettings?: ActionRunSettings;
+}
+
+/** Output field definition for AI actions */
+export interface AiOutputField {
+  type: "text" | "number" | "boolean";
+}
+
+/** AI action: runs headless claude -p or codex exec per row */
+export interface AiAction {
+  id: string;
+  type: "ai";
+  /** Primary target column (for single-output mode) */
+  target: string;
+  when?: string;
+  /** AI runtime: "claude" uses `claude -p`, "codex" uses `codex exec` */
+  runtime: "claude" | "codex";
+  /** Prompt template. Supports {{row.x}} and {{env.X}} references. */
+  prompt: string;
+  /** Named output fields, each maps to a target column.
+   *  When specified, the AI is instructed to return JSON with these keys. */
+  outputs?: Record<string, AiOutputField>;
+  /** Output format: "fields" for named fields, "json" for raw JSON schema */
+  outputFormat?: "fields" | "json";
+  /** Timeout in ms (default: 120000 = 2 minutes) */
+  timeout?: number;
+  onError?: OnErrorConfig;
+  runSettings?: ActionRunSettings;
 }
 
 /** Union of all action types */
@@ -255,7 +286,38 @@ export type Action =
   | ExecAction
   | LookupAction
   | WriteAction
-  | ScriptAction;
+  | ScriptAction
+  | AiAction;
+
+/** Per-action rate limit override */
+export interface ActionRateLimit {
+  /** Max requests in the window */
+  requests: number;
+  /** Window duration in milliseconds */
+  durationMs: number;
+}
+
+/** Per-action retry override */
+export interface ActionRetry {
+  maxRetries: number;
+  /** HTTP status codes or exit codes to retry on */
+  statusCodes?: number[];
+  retryBackoff?: string;
+}
+
+/** Per-action run settings (optional on any action) */
+export interface ActionRunSettings {
+  /** Per-action rate limit (overrides global).
+   *  TODO: not yet consumed by engine — types exist for MCP schema and future use. */
+  rateLimit?: ActionRateLimit;
+  /** Per-action retry (overrides global).
+   *  TODO: not yet consumed by engine — types exist for MCP schema and future use. */
+  retry?: ActionRetry;
+  /** Delay in seconds before running (max 600) */
+  delay?: number;
+  /** Auto-update: re-run when dependency columns change */
+  autoUpdate?: boolean;
+}
 
 /** Global pipeline execution settings */
 export interface PipelineSettings {

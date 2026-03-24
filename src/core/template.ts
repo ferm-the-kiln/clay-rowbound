@@ -8,7 +8,8 @@ import type { ExecutionContext } from "./types.js";
 export type OnMissingCallback = (source: string, key: string) => void;
 
 /**
- * Resolve template strings like {{row.email}} and {{env.API_KEY}}.
+ * Resolve template strings like {{row.email}}, {{env.API_KEY}}, or {{email}}.
+ * Variables without a prefix (e.g. {{email}}) default to the row namespace.
  * Missing variables resolve to empty string.
  *
  * When `onMissing` is provided, it is called for every variable that
@@ -19,10 +20,11 @@ export function resolveTemplate(
   context: ExecutionContext,
   onMissing?: OnMissingCallback,
 ): string {
-  const TEMPLATE_REGEX = /\{\{(row|env|item)\.([^}]+)\}\}/g;
+  const TEMPLATE_REGEX = /\{\{(?:(row|env|item)\.)?([^}]+)\}\}/g;
   return template.replace(
     TEMPLATE_REGEX,
-    (_match, source: string, key: string) => {
+    (_match, rawSource: string | undefined, key: string) => {
+      const source = rawSource ?? "row";
       if (source === "row") {
         const value = context.row[key];
         if (value === undefined && onMissing) {
@@ -63,10 +65,11 @@ export function resolveTemplateEscaped(
   escapeFn: (value: string) => string,
   onMissing?: OnMissingCallback,
 ): string {
-  const TEMPLATE_REGEX = /\{\{(row|env|item)\.([^}]+)\}\}/g;
+  const TEMPLATE_REGEX = /\{\{(?:(row|env|item)\.)?([^}]+)\}\}/g;
   return template.replace(
     TEMPLATE_REGEX,
-    (_match, source: string, key: string) => {
+    (_match, rawSource: string | undefined, key: string) => {
+      const source = rawSource ?? "row";
       let value: string | undefined;
       if (source === "row") {
         value = context.row[key];

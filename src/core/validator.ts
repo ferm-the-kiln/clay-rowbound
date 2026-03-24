@@ -34,6 +34,7 @@ const VALID_ACTION_TYPES = new Set([
   "lookup",
   "write",
   "script",
+  "ai",
 ]);
 
 /** Known retry backoff strategies. */
@@ -451,6 +452,29 @@ export function validateConfig(config: PipelineConfig): ValidationResult {
       ) {
         errors.push(
           `${label}: 'timeout' must be a positive number (got ${JSON.stringify(scriptAction.timeout)})`,
+        );
+      }
+    } else if (action.type === "ai") {
+      const aiAction = action as import("./types.js").AiAction;
+      if (!aiAction.runtime) {
+        errors.push(`${label}: ai action missing 'runtime'`);
+      } else if (
+        aiAction.runtime !== "claude" &&
+        aiAction.runtime !== "codex"
+      ) {
+        errors.push(
+          `${label}: ai action 'runtime' must be "claude" or "codex" (got "${aiAction.runtime}")`,
+        );
+      }
+      if (!aiAction.prompt) {
+        errors.push(`${label}: ai action missing 'prompt'`);
+      }
+      if (
+        aiAction.timeout !== undefined &&
+        (typeof aiAction.timeout !== "number" || aiAction.timeout <= 0)
+      ) {
+        errors.push(
+          `${label}: 'timeout' must be a positive number (got ${JSON.stringify(aiAction.timeout)})`,
         );
       }
     }

@@ -15,6 +15,13 @@ body {
   height: 100vh;
   display: flex;
   flex-direction: column;
+  overflow: hidden; /* prevent body scroll — #content handles scrolling */
+}
+#app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -39,6 +46,11 @@ body {
   gap: 8px;
   align-items: center;
 }
+.header-nav-label {
+  font-size: 12px;
+  color: #5f6368;
+  white-space: nowrap;
+}
 #header-nav select {
   flex: 1;
   padding: 6px 8px;
@@ -50,7 +62,9 @@ body {
 #content {
   flex: 1;
   overflow-y: auto;
+  overflow-x: hidden;
   padding: 16px;
+  min-height: 0; /* allow flex child to shrink and scroll */
 }
 #footer {
   padding: 10px 16px;
@@ -100,6 +114,7 @@ body {
 }
 .field-input, .field-select {
   width: 100%;
+  max-width: 100%;
   padding: 8px 10px;
   border: 1px solid #dadce0;
   border-radius: 4px;
@@ -114,6 +129,7 @@ body {
 }
 .field-textarea {
   width: 100%;
+  max-width: 100%;
   padding: 8px 10px;
   border: 1px solid #dadce0;
   border-radius: 4px;
@@ -139,9 +155,11 @@ body {
   gap: 6px;
   margin-bottom: 6px;
   align-items: center;
+  min-width: 0; /* prevent flex children from overflowing */
 }
 .kv-row input {
   flex: 1;
+  min-width: 0; /* allow inputs to shrink below content width */
   padding: 6px 8px;
   border: 1px solid #dadce0;
   border-radius: 4px;
@@ -202,6 +220,7 @@ body {
 .badge-waterfall { background: #e6f4ea; color: #188038; }
 .badge-transform { background: #fef7e0; color: #ea8600; }
 .badge-exec      { background: #fce8e6; color: #d93025; }
+.badge-ai        { background: #f3e8fd; color: #7c3aed; }
 .badge-lookup    { background: #f3e8fd; color: #8430ce; }
 .badge-write     { background: #e0f7fa; color: #00796b; }
 .badge-script    { background: #e8eaf6; color: #3949ab; }
@@ -209,6 +228,7 @@ body {
 /* Source type badges */
 .badge-src-http    { background: #e8f0fe; color: #1a73e8; }
 .badge-src-exec    { background: #fce8e6; color: #d93025; }
+.badge-src-ai      { background: #f3e8fd; color: #7c3aed; }
 .badge-src-webhook { background: #e6f4ea; color: #188038; }
 .badge-src-script  { background: #e8eaf6; color: #3949ab; }
 
@@ -302,13 +322,59 @@ body {
   background: #fef7e0; border: 1px solid #f9d67a; border-radius: 6px;
   padding: 10px 12px; margin-bottom: 16px; font-size: 12px; color: #ea8600;
 }
+/* Skeleton loading animation */
+.skeleton { border-radius: 4px; background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite; }
+@keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+.skeleton-header { height: 22px; width: 60%; margin-bottom: 12px; }
+.skeleton-card { height: 52px; width: 100%; margin-bottom: 10px; border-radius: 6px; }
+.skeleton-footer { height: 36px; width: 100%; }
+/* Tab bar */
+#tab-bar {
+  display: flex;
+  border-bottom: 1px solid #dadce0;
+  background: #fff;
+  flex-shrink: 0;
+  padding: 0 8px;
+}
+.tab-btn {
+  flex: 1;
+  padding: 10px 4px 8px;
+  border: none;
+  background: transparent;
+  font-size: 12px;
+  font-weight: 500;
+  color: #5f6368;
+  cursor: pointer;
+  text-align: center;
+  border-bottom: 2px solid transparent;
+  transition: color 0.15s, border-color 0.15s;
+}
+.tab-btn:hover { color: #202124; }
+.tab-btn.active {
+  color: #1a73e8;
+  border-bottom-color: #1a73e8;
+}
 </style>
 </head>
 <body>
 
 <div id="app">
-  <div id="header"></div>
-  <div id="content"><div class="loading">Loading&#8230;</div></div>
+  <div id="header">
+    <div id="header-title"><span>Rowbound</span></div>
+  </div>
+  <div id="tab-bar">
+    <button class="tab-btn active" onclick="switchTab('overview')" data-tab="overview">Actions</button>
+    <button class="tab-btn" onclick="switchTab('sources')" data-tab="sources">Sources</button>
+    <button class="tab-btn" onclick="switchTab('settings')" data-tab="settings">Settings</button>
+  </div>
+  <div id="content">
+    <div style="padding: 4px 0;">
+      <div class="skeleton skeleton-header"></div>
+      <div class="skeleton skeleton-card"></div>
+      <div class="skeleton skeleton-card"></div>
+      <div class="skeleton skeleton-card"></div>
+    </div>
+  </div>
   <div id="footer"></div>
 </div>
 
@@ -321,6 +387,7 @@ var state = {
   columnInfo: null,
   tabs: [],
   view: 'loading',
+  lastListView: 'overview',
   editingAction: null,
   originalAction: null,
   editingSource: null,
@@ -534,6 +601,13 @@ function generateId(col, type) {
 
 function deepCopy(obj) { return JSON.parse(JSON.stringify(obj)); }
 
+/** Return display type for badge — detects AI actions stored as exec or ai type. */
+function displayType(a) {
+  if (a.type === 'ai') return 'ai';
+  if (a.type === 'exec' && a.command && (a.command.indexOf('claude -p') >= 0 || a.command.indexOf('codex exec') >= 0)) return 'ai';
+  return a.type;
+}
+
 function actionSummary(a) {
   switch (a.type) {
     case 'http': return (a.method || 'GET') + ' ' + (a.url || '');
@@ -604,6 +678,37 @@ function serverCall(fn, arg, cb) {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
+   TAB BAR
+   ═══════════════════════════════════════════════════════════════════════════ */
+function switchTab(tab) {
+  // Update active tab styling
+  var btns = document.querySelectorAll('.tab-btn');
+  for (var i = 0; i < btns.length; i++) {
+    btns[i].className = btns[i].getAttribute('data-tab') === tab
+      ? 'tab-btn active' : 'tab-btn';
+  }
+  // Navigate to the tab's view
+  if (tab === 'overview') showOverview();
+  else if (tab === 'sources') showSources();
+  else if (tab === 'settings') showSettings();
+}
+
+function updateTabBar(activeTab) {
+  var bar = document.getElementById('tab-bar');
+  if (!bar) return;
+  // Show tab bar on list views and settings, hide on editors
+  var showTabs = (activeTab === 'overview' || activeTab === 'sources' || activeTab === 'settings');
+  bar.style.display = showTabs ? 'flex' : 'none';
+  if (showTabs) {
+    var btns = bar.querySelectorAll('.tab-btn');
+    for (var i = 0; i < btns.length; i++) {
+      btns[i].className = btns[i].getAttribute('data-tab') === activeTab
+        ? 'tab-btn active' : 'tab-btn';
+    }
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
    RENDER HEADER
    ═══════════════════════════════════════════════════════════════════════════ */
 function renderHeader(title, opts) {
@@ -623,7 +728,7 @@ function renderHeader(title, opts) {
     var actions = getActions();
     var configured = {};
     for (var i = 0; i < actions.length; i++) configured[actions[i].target] = true;
-    h += '<div id="header-nav"><select onchange="switchColumn(this.value)">';
+    h += '<div id="header-nav"><label class="header-nav-label">Column</label><select onchange="switchColumn(this.value)">';
     var headers = state.columnInfo.headers || [];
     for (var j = 0; j < headers.length; j++) {
       var hdr = headers[j];
@@ -676,7 +781,9 @@ function getTabSettings() {
 
 function showOverview() {
   state.view = 'overview';
-  renderHeader('All Actions', { showSettings: true });
+  state.lastListView = 'overview';
+  updateTabBar('overview');
+  renderHeader('Actions');
 
   var enabled = isTabEnabled();
   var actions = getActions();
@@ -702,7 +809,8 @@ function showOverview() {
       var a = actions[i];
       h += '<div class="action-item" onclick="editActionByIndex(' + i + ')">';
       h += '<div class="action-item-header">';
-      h += '<span class="badge badge-' + esc(a.type) + '">' + esc(a.type) + '</span>';
+      var dt = displayType(a);
+      h += '<span class="badge badge-' + esc(dt) + '">' + esc(dt === 'ai' ? 'AI' : dt) + '</span>';
       h += '<span class="action-item-title">' + esc(resolveColumnName(a.target)) + '</span>';
       h += '<div class="action-item-reorder">';
       if (i > 0) h += '<button onclick="event.stopPropagation();moveAction(' + i + ',-1)" title="Move up">&#9650;</button>';
@@ -715,8 +823,6 @@ function showOverview() {
   }
   safeSetHTML(document.getElementById('content'), h);
   renderFooter([
-    { label: 'Sources', cls: 'btn-text', action: 'showSources()' },
-    { label: 'Scripts', cls: 'btn-text', action: 'showScripts()' },
     'spacer',
     { label: '+ New Action', cls: 'btn-primary', action: 'showCreate()' }
   ]);
@@ -727,7 +833,9 @@ function showOverview() {
    ═══════════════════════════════════════════════════════════════════════════ */
 function showSources() {
   state.view = 'sources';
-  renderHeader('Sources', { showSettings: true });
+  state.lastListView = 'sources';
+  updateTabBar('sources');
+  renderHeader('Sources');
 
   var sources = getSources();
   var h = '';
@@ -743,7 +851,8 @@ function showSources() {
       var schedule = (s.type !== 'webhook') ? (s.schedule || 'manual') : 'webhook';
       h += '<div class="action-item" onclick="editSourceByIndex(' + i + ')">';
       h += '<div class="action-item-header">';
-      h += '<span class="badge badge-src-' + esc(s.type) + '">' + esc(s.type) + '</span>';
+      var sdt = displayType(s);
+      h += '<span class="badge badge-src-' + esc(sdt) + '">' + esc(sdt === 'ai' ? 'AI' : sdt) + '</span>';
       h += '<span class="action-item-title">' + esc(s.id) + '</span>';
       h += '<div class="action-item-reorder">';
       if (i > 0) h += '<button onclick="event.stopPropagation();moveSource(' + i + ',-1)" title="Move up">&#9650;</button>';
@@ -756,8 +865,6 @@ function showSources() {
   }
   safeSetHTML(document.getElementById('content'), h);
   renderFooter([
-    { label: 'Actions', cls: 'btn-text', action: 'showOverview()' },
-    { label: 'Scripts', cls: 'btn-text', action: 'showScripts()' },
     'spacer',
     { label: '+ New Source', cls: 'btn-primary', action: 'showCreateSource()' }
   ]);
@@ -783,6 +890,7 @@ function moveSource(idx, dir) {
 }
 
 function showCreateSource() {
+  updateTabBar('sourceEditor');
   var s = { id: 'new_source', type: 'http', method: 'POST', url: '', extract: '$', columns: {}, schedule: 'manual' };
   state.editingSource = s;
   state.originalSource = null;
@@ -797,6 +905,7 @@ function showCreateSource() {
 
 function showSourceEditor(source) {
   state.view = 'sourceEditor';
+  updateTabBar('sourceEditor');
   state.editingSource = deepCopy(source);
   state.originalSource = deepCopy(source);
   renderHeader('Source: ' + source.id, { back: 'showSources()' });
@@ -816,7 +925,7 @@ function renderSourceEditorContent() {
   h += '<div class="section"><div class="section-title">Source</div>';
   h += field('ID', '<input class="field-input" name="src_id" value="' + esc(s.id) + '">', 'Unique identifier');
   h += field('Type', '<select class="field-select" name="src_type" onchange="onSourceTypeChange(this.value)">' +
-    opt('http', s.type) + opt('exec', s.type) + opt('webhook', s.type) + opt('script', s.type) + '</select>');
+    labelOpt('webhook', 'Webhook', s.type) + labelOpt('http', 'HTTP', s.type) + labelOpt('ai', 'AI', s.type) + labelOpt('exec', 'Exec', s.type) + labelOpt('script', 'Script', s.type) + '</select>');
   h += '</div>';
 
   // Type-specific fields
@@ -862,6 +971,28 @@ function renderSourceEditorContent() {
       'Optional \u2014 extract array from JSON output');
     h += field('Timeout (ms)', '<input class="field-input" type="number" name="src_timeout" value="' + esc(s.timeout || 30000) + '">');
     h += '</div>';
+  } else if (s.type === 'ai') {
+    h += '<div class="section"><div class="section-title">Provider &amp; Model</div>';
+    var srcRuntime = s._ai_runtime || 'claude';
+    var srcModel = s._ai_model || '';
+    h += field('Provider', '<select class="field-select" name="src_ai_runtime" onchange="onSrcAiProviderChange(this.value)">' +
+      '<option value="claude"' + (srcRuntime === 'claude' ? ' selected' : '') + '>Claude Code</option>' +
+      '<option value="codex"' + (srcRuntime === 'codex' ? ' selected' : '') + '>Codex</option></select>');
+    h += '<div id="src-ai-model-container">';
+    h += buildAiModelSelect(srcRuntime, srcModel);
+    h += '</div>';
+    h += '</div>';
+
+    h += '<div class="section"><div class="section-title">Prompt</div>';
+    h += field('Prompt', '<textarea class="field-textarea" name="src_ai_prompt" rows="8" placeholder="Generate a list of companies in the SaaS space...">' + esc(s._ai_prompt || '') + '</textarea>',
+      'Describe the rows you want generated. The AI will return structured data.');
+    h += '</div>';
+
+    h += '<div class="section"><div class="section-title">Response</div>';
+    h += field('Extract (JSONPath)', '<input class="field-input" name="src_extract" value="' + esc(s.extract || '') + '" placeholder="$.results">',
+      'Optional \u2014 extract array from JSON output');
+    h += field('Timeout (ms)', '<input class="field-input" type="number" name="src_timeout" value="' + esc(s.timeout || 300000) + '">');
+    h += '</div>';
   }
   // webhook has no request fields
 
@@ -901,9 +1032,11 @@ function onSourceTypeChange(newType) {
   s.columns = readKvList('src_columns');
   s.dedup = getVal('src_dedup') || undefined;
   s.updateExisting = getVal('src_updateExisting') === 'true';
+  delete s._ai_runtime; delete s._ai_model; delete s._ai_prompt;
   if (newType === 'http') { s.method = 'POST'; s.url = ''; s.extract = '$'; }
   if (newType === 'exec') { s.command = ''; }
   if (newType === 'script') { s.script = ''; s.args = []; }
+  if (newType === 'ai') { s._ai_runtime = 'claude'; s._ai_prompt = ''; }
   renderSourceEditorContent();
 }
 
@@ -935,6 +1068,14 @@ function readFormSource() {
     if (sExt) s.extract = sExt;
     var sTimeout = parseInt(getVal('src_timeout'));
     if (sTimeout && sTimeout !== 30000) s.timeout = sTimeout;
+  } else if (type === 'ai') {
+    s._ai_runtime = getVal('src_ai_runtime') || 'claude';
+    s._ai_model = getVal('_ai_model') || '';
+    s._ai_prompt = getVal('src_ai_prompt') || '';
+    var aiExt = getVal('src_extract').trim();
+    if (aiExt) s.extract = aiExt;
+    var aiTimeout = parseInt(getVal('src_timeout'));
+    if (aiTimeout && aiTimeout !== 300000) s.timeout = aiTimeout;
   }
 
   s.columns = readKvList('src_columns');
@@ -1014,7 +1155,9 @@ function confirmDeleteSource() {
    ═══════════════════════════════════════════════════════════════════════════ */
 function showSettings() {
   state.view = 'settings';
-  renderHeader('Settings', { back: 'showOverview()' });
+  state.lastListView = 'settings';
+  updateTabBar('settings');
+  renderHeader('Settings');
   ensureConfig();
   // Per-tab settings override global
   var global = state.config.settings || {};
@@ -1041,9 +1184,28 @@ function showSettings() {
     '</select>');
   h += '</div>';
 
+  // Scripts section — manage reusable code blocks
+  h += '<div class="section"><div class="section-title">Scripts</div>';
+  var scripts = getScripts();
+  var scriptNames = Object.keys(scripts);
+  if (scriptNames.length === 0) {
+    h += '<p class="field-hint">No scripts configured. Scripts are reusable code blocks referenced by script actions and sources.</p>';
+  } else {
+    for (var si = 0; si < scriptNames.length; si++) {
+      var sn = scriptNames[si];
+      var scr = scripts[sn];
+      h += '<div class="action-item" onclick="editScript(\'' + esc(sn).replace(/'/g, "\\'") + '\')">';
+      h += '<div class="action-item-header">';
+      h += '<span class="badge badge-script">' + esc(scr.runtime || 'bash') + '</span>';
+      h += '<span class="action-item-title">' + esc(sn) + '</span>';
+      h += '</div></div>';
+    }
+  }
+  h += '<button class="btn btn-text" style="margin-top:4px" onclick="showCreateScript()">+ New Script</button>';
+  h += '</div>';
+
   safeSetHTML(document.getElementById('content'), h);
   renderFooter([
-    { label: 'Cancel', cls: 'btn-secondary', action: 'showOverview()' },
     'spacer',
     { label: 'Save', cls: 'btn-primary', action: 'saveSettings()' }
   ]);
@@ -1072,7 +1234,14 @@ function saveSettings() {
    ═══════════════════════════════════════════════════════════════════════════ */
 function showEditor(action, columnName) {
   state.view = 'editor';
-  state.editingAction = deepCopy(action);
+  updateTabBar('editor');
+  var a = deepCopy(action);
+  // Detect AI actions stored as exec: if it has _ai_runtime tag, or the command
+  // looks like a claude/codex invocation, present it as type "ai" in the editor
+  if (a.type === 'exec' && (a._ai_runtime || (a.command && (a.command.indexOf('claude -p') >= 0 || a.command.indexOf('codex exec') >= 0)))) {
+    a.type = 'ai';
+  }
+  state.editingAction = a;
   state.originalAction = deepCopy(action);
   if (columnName) state.columnInfo.column = columnName;
 
@@ -1096,14 +1265,14 @@ function renderEditorContent() {
   h += field('Type', buildTypeSelect(a.type));
   h += '</div>';
 
-  // Run conditions
-  h += '<div class="section"><div class="section-title">Run Conditions</div>';
-  h += field('Only run if', '<textarea class="field-textarea" name="when" placeholder="e.g. row.domain !== &#39;&#39;">' + esc(a.when || '') + '</textarea>',
-    'JavaScript expression. Use row.column for cell values.');
-  h += '</div>';
-
   // Type-specific fields
   h += buildTypeFields(a);
+
+  // Run conditions — at the bottom
+  h += '<div class="section"><div class="section-title">Run Conditions</div>';
+  h += field('Only run if', '<textarea class="field-textarea" name="when" placeholder="e.g. {{domain}} !== &#39;&#39;">' + esc(a.when || '') + '</textarea>',
+    'JavaScript expression. Use {{column}} for cell values.');
+  h += '</div>';
 
   safeSetHTML(document.getElementById('content'), h);
 }
@@ -1113,6 +1282,7 @@ function renderEditorContent() {
    ═══════════════════════════════════════════════════════════════════════════ */
 function showCreate(columnName) {
   state.view = 'create';
+  updateTabBar('create');
   var col = columnName || (state.columnInfo ? state.columnInfo.column : 'new_column');
   if (state.columnInfo) state.columnInfo.column = col;
   var a = { id: generateId(col, 'http'), type: 'http', target: col, method: 'GET', url: '', extract: '' };
@@ -1134,6 +1304,7 @@ function showCreate(columnName) {
 function showColumn(columnName) {
   var col = columnName || (state.columnInfo ? state.columnInfo.column : '');
   if (!col) { showOverview(); return; }
+  updateTabBar('column');
   state.columnInfo.column = col;
   var action = findActionByTarget(col);
   if (action) {
@@ -1145,6 +1316,7 @@ function showColumn(columnName) {
 
 function showCreatePrompt(col) {
   state.view = 'create';
+  updateTabBar('create');
   renderHeader(col, { back: 'showOverview()', columnSelect: true });
   var h = '<div class="empty-state">';
   h += '<div class="empty-state-title">No action for &quot;' + esc(col) + '&quot;</div>';
@@ -1159,11 +1331,11 @@ function showCreatePrompt(col) {
    TYPE-SPECIFIC FORM BUILDERS
    ═══════════════════════════════════════════════════════════════════════════ */
 function buildTypeSelect(current) {
-  var types = ['http', 'waterfall', 'transform', 'exec', 'lookup', 'write', 'script'];
+  var types = ['http', 'ai', 'exec', 'transform', 'script', 'waterfall', 'lookup', 'write'];
   var h = '<select class="field-select" name="type" onchange="onTypeChange(this.value)">';
   for (var i = 0; i < types.length; i++) {
     h += '<option value="' + types[i] + '"' + (types[i] === current ? ' selected' : '') + '>' +
-         types[i].charAt(0).toUpperCase() + types[i].slice(1) + '</option>';
+         (types[i] === 'ai' ? 'AI' : types[i].charAt(0).toUpperCase() + types[i].slice(1)) + '</option>';
   }
   return h + '</select>';
 }
@@ -1177,6 +1349,7 @@ function buildTypeFields(a) {
     case 'lookup': return buildLookupFields(a);
     case 'write': return buildWriteFields(a);
     case 'script': return buildScriptFields(a);
+    case 'ai': return buildAiFields(a);
     default: return '';
   }
 }
@@ -1189,7 +1362,7 @@ function buildHttpFields(a) {
     opt('GET', a.method) + opt('POST', a.method) + opt('PUT', a.method) +
     opt('PATCH', a.method) + opt('DELETE', a.method) + '</select></div>';
   h += '</div>';
-  h += field('URL', '<input class="field-input" name="url" value="' + esc(a.url || '') + '" placeholder="https://api.example.com/{{row.domain}}">', 'Supports {{row.column}} and {{env.VAR}} templates');
+  h += field('URL', '<input class="field-input" name="url" value="' + esc(a.url || '') + '" placeholder="https://api.example.com/{{domain}}">', 'Supports {{column}} and {{env.VAR}} templates');
   h += '</div>';
 
   h += '<div class="section"><div class="section-title">Headers</div>';
@@ -1228,17 +1401,25 @@ function buildWaterfallFields(a) {
 }
 
 function buildProviderCard(p, idx) {
+  var total = (state.editingAction.providers || []).length;
   var h = '<div class="provider-card" data-idx="' + idx + '">';
   h += '<div class="provider-header"><span>' + esc(p.name || 'Provider ' + (idx + 1)) + '</span>';
-  h += '<button class="kv-remove" onclick="removeProvider(' + idx + ')" title="Remove">&#215;</button></div>';
+  h += '<div style="display:flex;gap:2px;align-items:center">';
+  if (idx > 0) h += '<button class="btn-icon" onclick="moveProvider(' + idx + ',-1)" title="Move up">&#9650;</button>';
+  if (idx < total - 1) h += '<button class="btn-icon" onclick="moveProvider(' + idx + ',1)" title="Move down">&#9660;</button>';
+  h += '<button class="kv-remove" onclick="removeProvider(' + idx + ')" title="Remove">&#215;</button>';
+  h += '</div></div>';
   h += '<div class="provider-body">';
   h += field('Name', '<input class="field-input" name="p_name_' + idx + '" value="' + esc(p.name || '') + '" placeholder="e.g. hunter">');
   h += '<div class="field-row">';
   h += '<div class="field">' + fieldLabel('Method');
   h += '<select class="field-select" name="p_method_' + idx + '">' +
-    opt('GET', p.method) + opt('POST', p.method) + opt('PUT', p.method) + '</select></div>';
+    opt('GET', p.method) + opt('POST', p.method) + opt('PUT', p.method) +
+    opt('PATCH', p.method) + opt('DELETE', p.method) + '</select></div>';
   h += '</div>';
   h += field('URL', '<input class="field-input" name="p_url_' + idx + '" value="' + esc(p.url || '') + '" placeholder="https://...">');
+  h += field('Body', '<textarea class="field-textarea" name="p_body_' + idx + '" placeholder="JSON body (optional)">' +
+    esc(p.body ? JSON.stringify(p.body, null, 2) : '') + '</textarea>', 'JSON format. Supports templates.');
   h += field('Extract', '<input class="field-input" name="p_extract_' + idx + '" value="' + esc(p.extract || '') + '" placeholder="$.result">');
   h += '<details style="margin-top:8px"><summary class="field-label" style="cursor:pointer">Headers &amp; Error Handling</summary>';
   h += '<div style="margin-top:8px">';
@@ -1253,9 +1434,9 @@ function buildProviderCard(p, idx) {
 function buildTransformFields(a) {
   var h = '<div class="section"><div class="section-title">Expression</div>';
   h += field('JavaScript Expression',
-    '<textarea class="field-textarea" name="expression" rows="3" placeholder="`${row.first_name} ${row.last_name}`">' +
+    '<textarea class="field-textarea" name="expression" rows="3" placeholder="`${first_name} ${last_name}`">' +
     esc(a.expression || '') + '</textarea>',
-    'Compute a new value. Access row data via row.column_name');
+    'Compute a new value. Access columns via {{column_name}}');
   h += '</div>';
   return h;
 }
@@ -1263,7 +1444,7 @@ function buildTransformFields(a) {
 function buildExecFields(a) {
   var h = '<div class="section"><div class="section-title">Command</div>';
   h += field('Shell Command',
-    '<textarea class="field-textarea" name="command" placeholder="whois {{row.domain}} | grep Registrar:">' +
+    '<textarea class="field-textarea" name="command" placeholder="whois {{domain}} | grep Registrar:">' +
     esc(a.command || '') + '</textarea>',
     'Template values are shell-escaped. Note: exec only works via CLI, not in Google Sheets.');
   h += field('Extract (JSONPath)', '<input class="field-input" name="extract" value="' + esc(a.extract || '') + '" placeholder="Optional \u2014 extract from JSON output">');
@@ -1283,13 +1464,10 @@ function buildLookupFields(a) {
 
   h += '<div class="section"><div class="section-title">Match</div>';
   h += field('Match Column', '<input class="field-input" name="matchColumn" value="' + esc(a.matchColumn || '') + '" placeholder="Column header in source tab">');
-  h += field('Match Value', '<input class="field-input" name="matchValue" value="' + esc(a.matchValue || '') + '" placeholder="{{row.domain}}">',
+  h += field('Match Value', '<input class="field-input" name="matchValue" value="' + esc(a.matchValue || '') + '" placeholder="{{domain}}">',
     'Template \u2014 compared against each row in match column');
   h += field('Operator', '<select class="field-select" name="matchOperator">' +
     opt('equals', a.matchOperator) + opt('contains', a.matchOperator) + '</select>');
-  h += field('Match Mode', '<select class="field-select" name="matchMode">' +
-    opt('first', a.matchMode) + opt('all', a.matchMode) + '</select>',
-    '"all" returns matches as a JSON array');
   h += '</div>';
 
   h += '<div class="section"><div class="section-title">Return</div>';
@@ -1301,15 +1479,6 @@ function buildLookupFields(a) {
 function buildWriteFields(a) {
   var h = '<div class="section"><div class="section-title">Destination</div>';
   h += field('Destination Tab', buildTabSelect('destTab', a.destTab));
-  h += field('Mode', '<select class="field-select" name="mode" onchange="toggleUpsert(this.value)">' +
-    opt('append', a.mode) + opt('upsert', a.mode) + '</select>');
-  h += '</div>';
-
-  h += '<div class="section" id="upsert-section" style="' + ((a.mode === 'upsert') ? '' : 'display:none') + '">';
-  h += '<div class="section-title">Upsert Match</div>';
-  var um = a.upsertMatch || {};
-  h += field('Match Column', '<input class="field-input" name="upsertMatch_column" value="' + esc(um.column || '') + '" placeholder="Column in destination tab">');
-  h += field('Match Value', '<input class="field-input" name="upsertMatch_value" value="' + esc(um.value || '') + '" placeholder="{{row.email}}">');
   h += '</div>';
 
   h += '<div class="section"><div class="section-title">Column Mappings</div>';
@@ -1317,7 +1486,7 @@ function buildWriteFields(a) {
   h += '</div>';
 
   h += '<div class="section"><div class="section-title">Array Expansion (optional)</div>';
-  h += field('Expand', '<input class="field-input" name="expand" value="' + esc(a.expand || '') + '" placeholder="{{row.contacts_json}}">',
+  h += field('Expand', '<input class="field-input" name="expand" value="' + esc(a.expand || '') + '" placeholder="{{contacts_json}}">',
     'Template resolving to JSON array \u2014 creates one row per element');
   h += field('Expand Path', '<input class="field-input" name="expandPath" value="' + esc(a.expandPath || '') + '" placeholder="$.items">',
     'JSONPath to extract array from expanded value');
@@ -1326,8 +1495,22 @@ function buildWriteFields(a) {
 }
 
 function buildScriptFields(a) {
+  // Resolve the script code inline — if referencing a named script, load its code
+  var scriptCode = a._inlineCode || '';
+  var scriptRuntime = a._inlineRuntime || 'bash';
+  if (a.script && !a._inlineCode) {
+    var scripts = getScripts();
+    if (scripts[a.script]) {
+      scriptCode = scripts[a.script].code || '';
+      scriptRuntime = scripts[a.script].runtime || 'bash';
+    }
+  }
+
   var h = '<div class="section"><div class="section-title">Script</div>';
-  h += field('Script Name', buildScriptSelect('script', a.script), 'Select a script defined in the Scripts section');
+  h += field('Runtime', '<select class="field-select" name="_inlineRuntime">' +
+    opt('bash', scriptRuntime) + opt('python3', scriptRuntime) + opt('node', scriptRuntime) +
+    '</select>');
+  h += field('Code', '<textarea class="field-textarea" name="_inlineCode" rows="6" placeholder="#!/bin/bash&#10;echo &#34;hello&#34;">' + esc(scriptCode) + '</textarea>');
   h += '</div>';
 
   h += '<div class="section"><div class="section-title">Arguments</div>';
@@ -1341,6 +1524,203 @@ function buildScriptFields(a) {
   h += '</div>';
 
   return h;
+}
+
+function buildAiFields(a) {
+  // AI actions store their config as _ai_* prefixed fields, then generate
+  // an exec command on save. When editing, parse existing exec command back.
+  var runtime = a._ai_runtime || 'claude';
+  var model = a._ai_model || '';
+  var maxTurns = a._ai_maxTurns || '25';
+  var prompt = a._ai_prompt || '';
+  var toolsFlag = a._ai_tools !== false;
+
+  // If this was a previously saved AI action (stored as exec), parse it back
+  if (a.type === 'ai' && a.command && !a._ai_prompt) {
+    var parsed = parseAiCommand(a.command);
+    if (parsed) {
+      runtime = parsed.runtime;
+      model = parsed.model;
+      maxTurns = parsed.maxTurns;
+      prompt = parsed.prompt;
+      toolsFlag = parsed.tools;
+    }
+  }
+
+  var h = '<div class="section"><div class="section-title">Provider &amp; Model</div>';
+  h += field('Provider', '<select class="field-select" name="_ai_runtime" onchange="onAiProviderChange(this.value)">' +
+    '<option value="claude"' + (runtime === 'claude' ? ' selected' : '') + '>Claude Code</option>' +
+    '<option value="codex"' + (runtime === 'codex' ? ' selected' : '') + '>Codex</option>' +
+    '</select>');
+
+  // Model dropdown — options depend on provider
+  h += '<div id="ai-model-container">';
+  h += buildAiModelSelect(runtime, model);
+  h += '</div>';
+  h += '</div>';
+
+  h += '<div class="section"><div class="section-title">Settings</div>';
+  h += field('Max Turns', '<input class="field-input" type="number" name="_ai_maxTurns" value="' + esc(maxTurns) + '" min="1" max="100" placeholder="25">',
+    'Max agent tool-use turns (default: 25)');
+  h += field('Tools', '<select class="field-select" name="_ai_tools">' +
+    '<option value="true"' + (toolsFlag ? ' selected' : '') + '>Enabled \u2014 web search, file read, etc.</option>' +
+    '<option value="false"' + (!toolsFlag ? ' selected' : '') + '>Disabled \u2014 text only</option></select>');
+  h += '</div>';
+
+  h += '<div class="section"><div class="section-title">Prompt</div>';
+  h += field('Prompt', '<textarea class="field-textarea" name="_ai_prompt" rows="8" placeholder="Research {{company}} and return...">' + esc(prompt) + '</textarea>',
+    'Use {{column}} for row data. The AI will execute this prompt per row.');
+  h += '</div>';
+
+  // Output definition
+  var outputFormat = a._ai_outputFormat || 'fields';
+  var outputFields = a._ai_outputFields || [];
+  var outputSchema = a._ai_outputSchema || '';
+
+  h += '<div class="section"><div class="section-title">Define Outputs</div>';
+  h += '<div class="field"><span class="field-label">Output format</span>';
+  h += '<label style="display:block;margin:4px 0;cursor:pointer"><input type="radio" name="_ai_outputFormat" value="fields"' + (outputFormat === 'fields' ? ' checked' : '') + ' onchange="toggleAiOutput(\'fields\')"> Fields</label>';
+  h += '<label style="display:block;margin:4px 0;cursor:pointer"><input type="radio" name="_ai_outputFormat" value="json"' + (outputFormat === 'json' ? ' checked' : '') + ' onchange="toggleAiOutput(\'json\')"> JSON Schema</label>';
+  h += '</div>';
+
+  // Fields mode
+  h += '<div id="ai-output-fields" style="' + (outputFormat === 'fields' ? '' : 'display:none') + '">';
+  h += '<div id="ai-fields-list">';
+  if (outputFields.length === 0) outputFields = [{ name: 'response', type: 'text' }];
+  for (var fi = 0; fi < outputFields.length; fi++) {
+    h += buildAiOutputFieldRow(fi, outputFields[fi]);
+  }
+  h += '</div>';
+  h += '<button class="kv-add" type="button" onclick="addAiOutputField()">+ Add output</button>';
+  h += '</div>';
+
+  // JSON Schema mode
+  h += '<div id="ai-output-schema" style="' + (outputFormat === 'json' ? '' : 'display:none') + '">';
+  h += '<textarea class="field-textarea" name="_ai_outputSchema" rows="10" placeholder=\'{"type":"object","properties":{...}}\'>' + esc(outputSchema) + '</textarea>';
+  h += '<div class="field-hint">JSON Schema defining the output structure</div>';
+  h += '</div>';
+  h += '</div>';
+
+  h += '<div class="section"><div class="section-title">Response</div>';
+  h += field('Timeout (ms)', '<input class="field-input" type="number" name="timeout" value="' + esc(a.timeout || 300000) + '">',
+    'AI actions may take longer \u2014 default 5 minutes');
+  h += '</div>';
+
+  h += '<div class="section"><div class="section-title">Error Handling</div>';
+  h += buildKvList('onError', a.onError || {}, 'Exit Code', 'Action (skip / {write: "value"})');
+  h += '</div>';
+
+  return h;
+}
+
+function buildAiModelSelect(provider, current) {
+  var models;
+  if (provider === 'codex') {
+    models = [
+      { value: '', label: 'Default' },
+      { value: 'gpt-5.4', label: 'GPT-5.4' },
+      { value: 'gpt-5.4-mini', label: 'GPT-5.4 Mini' },
+      { value: 'gpt-5.4-nano', label: 'GPT-5.4 Nano' }
+    ];
+  } else {
+    models = [
+      { value: '', label: 'Default' },
+      { value: 'claude-sonnet-4-6', label: 'Sonnet 4.6' },
+      { value: 'claude-opus-4-6', label: 'Opus 4.6' },
+      { value: 'claude-haiku-4-5-20251001', label: 'Haiku 4.5' },
+      { value: 'claude-sonnet-4-5-20250514', label: 'Sonnet 4.5' }
+    ];
+  }
+  var h = field('Model', '<select class="field-select" name="_ai_model">' +
+    models.map(function(m) {
+      return '<option value="' + esc(m.value) + '"' + (m.value === current ? ' selected' : '') + '>' + esc(m.label) + '</option>';
+    }).join('') + '</select>');
+  return h;
+}
+
+function onAiProviderChange(provider) {
+  var container = document.getElementById('ai-model-container');
+  if (container) safeSetHTML(container, buildAiModelSelect(provider, ''));
+}
+function onSrcAiProviderChange(provider) {
+  var container = document.getElementById('src-ai-model-container');
+  if (container) safeSetHTML(container, buildAiModelSelect(provider, ''));
+}
+
+function toggleAiOutput(mode) {
+  document.getElementById('ai-output-fields').style.display = mode === 'fields' ? '' : 'none';
+  document.getElementById('ai-output-schema').style.display = mode === 'json' ? '' : 'none';
+}
+
+function buildAiOutputFieldRow(idx, f) {
+  var h = '<div class="kv-row" data-ai-field="' + idx + '">';
+  h += '<input class="field-input" data-ai-field-name="' + idx + '" value="' + esc(f.name || '') + '" placeholder="Field name" style="flex:2">';
+  h += '<select class="field-select" data-ai-field-type="' + idx + '" style="flex:1;min-width:80px">';
+  var types = ['text', 'number', 'checkbox'];
+  for (var i = 0; i < types.length; i++) {
+    h += '<option value="' + types[i] + '"' + (types[i] === (f.type || 'text') ? ' selected' : '') + '>' +
+      types[i].charAt(0).toUpperCase() + types[i].slice(1) + '</option>';
+  }
+  h += '</select>';
+  h += '<button class="kv-remove" type="button" onclick="removeAiOutputField(' + idx + ')" title="Remove">&times;</button>';
+  h += '</div>';
+  return h;
+}
+
+function addAiOutputField() {
+  var list = document.getElementById('ai-fields-list');
+  var rows = list.querySelectorAll('[data-ai-field]');
+  var idx = rows.length;
+  // Use safeSetHTML-compatible approach: build the row and append via DOM
+  var tmp = document.createElement('div');
+  safeSetHTML(tmp, buildAiOutputFieldRow(idx, { name: '', type: 'text' }));
+  list.appendChild(tmp.firstChild);
+}
+
+function removeAiOutputField(idx) {
+  var row = document.querySelector('[data-ai-field="' + idx + '"]');
+  if (row) row.remove();
+}
+
+function readAiOutputFields() {
+  var fields = [];
+  var names = document.querySelectorAll('[data-ai-field-name]');
+  for (var i = 0; i < names.length; i++) {
+    var name = names[i].value.trim();
+    if (!name) continue;
+    var idx = names[i].getAttribute('data-ai-field-name');
+    var typeEl = document.querySelector('[data-ai-field-type="' + idx + '"]');
+    fields.push({ name: name, type: typeEl ? typeEl.value : 'text' });
+  }
+  return fields;
+}
+
+/** Parse an existing AI exec command back into its component fields. */
+function parseAiCommand(cmd) {
+  if (!cmd) return null;
+  var result = { runtime: 'claude', model: '', maxTurns: '25', prompt: '', tools: true };
+
+  if (cmd.indexOf('codex exec') >= 0 || cmd.indexOf('codex ') >= 0) {
+    result.runtime = 'codex';
+  }
+
+  var modelMatch = cmd.match(/--model\s+(\S+)/);
+  if (modelMatch) result.model = modelMatch[1];
+
+  var turnsMatch = cmd.match(/--max-turns\s+(\d+)/);
+  if (turnsMatch) result.maxTurns = turnsMatch[1];
+
+  if (cmd.indexOf('--tools default') < 0 && cmd.indexOf('--tools') < 0) {
+    result.tools = false;
+  }
+
+  // Extract the prompt — everything inside the outermost single quotes after the flags
+  var promptMatch = cmd.match(/'([\s\S]+)'\s*(?:<\s*\/dev\/null)?$/);
+  if (promptMatch) {
+    result.prompt = promptMatch[1].replace(/''/g, "'");
+  }
+
+  return result;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -1359,6 +1739,10 @@ function fieldLabel(label) {
 function opt(value, current) {
   return '<option value="' + esc(value) + '"' + (value === current ? ' selected' : '') + '>' +
          esc(value) + '</option>';
+}
+function labelOpt(value, label, current) {
+  return '<option value="' + esc(value) + '"' + (value === current ? ' selected' : '') + '>' +
+         esc(label) + '</option>';
 }
 
 function getVal(name) {
@@ -1538,13 +1922,85 @@ function readFormAction() {
       break;
 
     case 'script':
-      a.script = getVal('script');
+      // Inline script: save code as a named script in the config, then reference it
+      var inlineCode = getVal('_inlineCode').trim();
+      var inlineRuntime = getVal('_inlineRuntime') || 'bash';
+      var scriptName = a.id + '_script';
+      if (inlineCode) {
+        var scripts = getScripts();
+        scripts[scriptName] = { runtime: inlineRuntime, code: inlineCode };
+        setScripts(scripts);
+      }
+      a.script = scriptName;
       var args = readArgsList('args');
       if (args.length > 0) a.args = args;
       var ext = getVal('extract').trim();
       if (ext) a.extract = ext;
       var timeout = parseInt(getVal('timeout'));
       if (timeout && timeout !== 30000) a.timeout = timeout;
+      break;
+
+    case 'ai':
+      // AI type is stored as an exec action with an auto-generated command
+      a.type = 'exec';
+      var aiRuntime = getVal('_ai_runtime') || 'claude';
+      var aiModel = getVal('_ai_model').trim();
+      var aiMaxTurns = getVal('_ai_maxTurns').trim() || '25';
+      var aiTools = getVal('_ai_tools') === 'true';
+      var aiPrompt = getVal('_ai_prompt').trim();
+
+      // Read output definitions
+      var aiOutputFormat = 'fields';
+      var radios = document.querySelectorAll('input[name="_ai_outputFormat"]');
+      for (var ri = 0; ri < radios.length; ri++) {
+        if (radios[ri].checked) aiOutputFormat = radios[ri].value;
+      }
+      var aiOutputFields = readAiOutputFields();
+      var aiOutputSchema = getVal('_ai_outputSchema').trim();
+
+      // Build the output instruction to append to the prompt
+      var outputInstruction = '';
+      if (aiOutputFormat === 'fields' && aiOutputFields.length > 0) {
+        var schemaObj = {};
+        for (var ofi = 0; ofi < aiOutputFields.length; ofi++) {
+          var typeMap = { text: 'string', number: 'number', boolean: 'boolean', url: 'string', email: 'string' };
+          schemaObj[aiOutputFields[ofi].name] = typeMap[aiOutputFields[ofi].type] || 'string';
+        }
+        outputInstruction = '\n\nYour response must be ONLY a raw JSON object \u2014 no preamble, no commentary, no markdown fences. The very first character must be { and the very last must be }. Schema: ' + JSON.stringify(schemaObj);
+      } else if (aiOutputFormat === 'json' && aiOutputSchema) {
+        outputInstruction = '\n\nYour response must be ONLY a raw JSON object \u2014 no preamble, no commentary, no markdown fences. The very first character must be { and the very last must be }. Output must conform to this JSON Schema: ' + aiOutputSchema;
+      }
+
+      var fullPrompt = aiPrompt + outputInstruction;
+
+      // Build the exec command
+      var cmd;
+      if (aiRuntime === 'claude') {
+        cmd = 'claude -p';
+        if (aiModel) cmd += ' --model ' + aiModel;
+        if (aiMaxTurns && aiMaxTurns !== '0') cmd += ' --max-turns ' + aiMaxTurns;
+        if (aiTools) cmd += ' --tools default';
+        cmd += " --no-session-persistence '" + fullPrompt.replace(/'/g, "'\\''") + "' < /dev/null";
+      } else {
+        cmd = 'codex exec';
+        if (aiModel) cmd += ' --model ' + aiModel;
+        cmd += " -s read-only '" + fullPrompt.replace(/'/g, "'\\''") + "'";
+      }
+      a.command = cmd;
+      // Tag it so the sidebar can detect it's an AI action when re-editing
+      a._ai_runtime = aiRuntime;
+      a._ai_model = aiModel;
+      a._ai_maxTurns = aiMaxTurns;
+      a._ai_prompt = aiPrompt; // Store original prompt WITHOUT output instructions
+      a._ai_tools = aiTools;
+      a._ai_outputFormat = aiOutputFormat;
+      a._ai_outputFields = aiOutputFields;
+      a._ai_outputSchema = aiOutputSchema;
+
+      var timeout = parseInt(getVal('timeout'));
+      if (timeout) a.timeout = timeout;
+      var aiErr = parseOnError(readKvList('onError'));
+      if (aiErr) a.onError = aiErr;
       break;
   }
 
@@ -1562,6 +2018,8 @@ function readProviders() {
       url: getVal('p_url_' + idx) || '',
       extract: getVal('p_extract_' + idx) || ''
     };
+    var bodyStr = getVal('p_body_' + idx).trim();
+    if (bodyStr) { try { p.body = JSON.parse(bodyStr); } catch(e) { p.body = bodyStr; } }
     var ph = readKvList('p_headers_' + idx);
     if (Object.keys(ph).length > 0) p.headers = ph;
     var pe = parseOnError(readKvList('p_onError_' + idx));
@@ -1639,15 +2097,20 @@ function saveAction() {
     }
   }
 
-  if (found >= 0) {
+  var isUpdate = found >= 0;
+  if (isUpdate) {
     actions[found] = newAction;
   } else {
     actions.push(newAction);
   }
   setActions(actions);
-  persistConfig(found >= 0 ? 'Action updated' : 'Action created');
-  state.editingAction = deepCopy(newAction);
-  state.originalAction = deepCopy(newAction);
+  persistConfig(isUpdate ? 'Action updated' : 'Action created');
+  if (isUpdate) {
+    state.editingAction = deepCopy(newAction);
+    state.originalAction = deepCopy(newAction);
+  } else {
+    showOverview();
+  }
 }
 
 function cancelEdit() {
@@ -1715,12 +2178,27 @@ function removeProvider(idx) {
   renderEditorContent();
 }
 
+function moveProvider(idx, dir) {
+  var providers = readProviders();
+  var newIdx = idx + dir;
+  if (newIdx < 0 || newIdx >= providers.length) return;
+  var temp = providers[idx];
+  providers[idx] = providers[newIdx];
+  providers[newIdx] = temp;
+  state.editingAction.providers = providers;
+  state.editingAction.when = getVal('when');
+  state.editingAction.id = getVal('id');
+  renderEditorContent();
+}
+
 /* ═══════════════════════════════════════════════════════════════════════════
    VIEW: SCRIPTS
    ═══════════════════════════════════════════════════════════════════════════ */
 function showScripts() {
   state.view = 'scripts';
-  renderHeader('Scripts', { showSettings: true });
+  state.lastListView = 'scripts';
+  updateTabBar('scripts');
+  renderHeader('Scripts');
 
   var scripts = getScripts();
   var names = Object.keys(scripts);
@@ -1747,8 +2225,6 @@ function showScripts() {
   }
   safeSetHTML(document.getElementById('content'), h);
   renderFooter([
-    { label: 'Actions', cls: 'btn-text', action: 'showOverview()' },
-    { label: 'Sources', cls: 'btn-text', action: 'showSources()' },
     'spacer',
     { label: '+ New Script', cls: 'btn-primary', action: 'showCreateScript()' }
   ]);
@@ -1756,13 +2232,14 @@ function showScripts() {
 
 function showCreateScript() {
   state.view = 'scriptEditor';
+  updateTabBar('scriptEditor');
   var sc = { runtime: 'bash', code: '' };
   state.editingScript = sc;
   state.originalScript = null;
-  renderHeader('New Script', { back: 'showScripts()' });
+  renderHeader('New Script', { back: 'showSettings()' });
   renderScriptEditorContent('');
   renderFooter([
-    { label: 'Cancel', cls: 'btn-secondary', action: 'showScripts()' },
+    { label: 'Cancel', cls: 'btn-secondary', action: 'showSettings()' },
     'spacer',
     { label: 'Create', cls: 'btn-primary', action: 'saveScript()' }
   ]);
@@ -1770,16 +2247,17 @@ function showCreateScript() {
 
 function editScript(name) {
   state.view = 'scriptEditor';
+  updateTabBar('scriptEditor');
   var scripts = getScripts();
   var sc = deepCopy(scripts[name] || { runtime: 'bash', code: '' });
   state.editingScript = sc;
   state.originalScript = name;
-  renderHeader('Script: ' + name, { back: 'showScripts()' });
+  renderHeader('Script: ' + name, { back: 'showSettings()' });
   renderScriptEditorContent(name);
   renderFooter([
     { label: 'Delete', cls: 'btn-danger', action: 'confirmDeleteScript()' },
     'spacer',
-    { label: 'Cancel', cls: 'btn-secondary', action: 'showScripts()' },
+    { label: 'Cancel', cls: 'btn-secondary', action: 'showSettings()' },
     { label: 'Save', cls: 'btn-primary', action: 'saveScript()' }
   ]);
 }
@@ -1823,7 +2301,7 @@ function saveScript() {
   persistConfig(state.originalScript ? 'Script updated' : 'Script created');
   state.editingScript = deepCopy(sc);
   state.originalScript = name;
-  showScripts();
+  showSettings();
 }
 
 function confirmDeleteScript() {
@@ -1846,12 +2324,12 @@ function confirmDeleteScript() {
   deleteBtn.textContent = 'Delete';
   deleteBtn.onclick = function() {
     overlay.remove();
-    if (!state.originalScript) { showScripts(); return; }
+    if (!state.originalScript) { showSettings(); return; }
     var scripts = getScripts();
     delete scripts[state.originalScript];
     setScripts(scripts);
     persistConfig('Script deleted');
-    showScripts();
+    showSettings();
   };
   btns.appendChild(cancelBtn);
   btns.appendChild(deleteBtn);
@@ -1878,7 +2356,28 @@ function persistConfig(message) {
 /* ═══════════════════════════════════════════════════════════════════════════
    INITIALIZATION
    ═══════════════════════════════════════════════════════════════════════════ */
+function applyInitData(data) {
+  state.config = data.config;
+  state.columnInfo = data.columnInfo;
+  state.tabs = data.tabs || [];
+  ensureConfig();
+  switch (data.initialView) {
+    case 'overview': showOverview(); break;
+    case 'sources': showSources(); break;
+    case 'settings': showSettings(); break;
+    default: showOverview(); break;
+  }
+}
+
 function init() {
+  // Try to show from session cache instantly while fetching fresh data
+  try {
+    var cached = sessionStorage.getItem('rb_initData');
+    if (cached) {
+      applyInitData(JSON.parse(cached));
+    }
+  } catch (e) { /* sessionStorage may be unavailable in iframe */ }
+
   serverCall('getInitData', undefined, function(err, data) {
     if (err) {
       safeSetHTML(document.getElementById('content'),
@@ -1886,17 +2385,9 @@ function init() {
         '<p>' + esc(err.message || 'Unknown error') + '</p></div>');
       return;
     }
-    state.config = data.config;
-    state.columnInfo = data.columnInfo;
-    state.tabs = data.tabs || [];
-    ensureConfig();
-    switch (data.initialView) {
-      case 'overview': showOverview(); break;
-      case 'sources': showSources(); break;
-      case 'scripts': showScripts(); break;
-      case 'settings': showSettings(); break;
-      default: showColumn(); break;
-    }
+    // Cache for instant load next time
+    try { sessionStorage.setItem('rb_initData', JSON.stringify(data)); } catch (e) {}
+    applyInitData(data);
   });
 }
 

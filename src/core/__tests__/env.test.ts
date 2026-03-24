@@ -43,7 +43,7 @@ describe("buildSafeEnv", () => {
     const env = buildSafeEnv();
     expect(env.DATABASE_URL).toBeUndefined();
     expect(env.AWS_SECRET_ACCESS_KEY).toBeUndefined();
-    expect(env.HOME).toBeUndefined();
+    // HOME is now included as an essential system var for CLI tools
   });
 
   it("includes env vars referenced in config templates", () => {

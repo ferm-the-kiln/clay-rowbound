@@ -1,6 +1,32 @@
 import vm from "node:vm";
 import type { ExecutionContext } from "./types.js";
 
+/**
+ * Expand {{column}} / {{row.column}} / {{env.VAR}} placeholders in a
+ * condition expression into quoted JS string literals so users can write
+ * e.g. `{{domain}} !== ''` instead of `row.domain !== ''`.
+ */
+const TEMPLATE_REGEX = /\{\{(?:(row|env)\.)?([^}]+)\}\}/g;
+function expandTemplates(
+  expression: string,
+  context: ExecutionContext,
+): string {
+  return expression.replace(
+    TEMPLATE_REGEX,
+    (_match, rawSource: string | undefined, key: string) => {
+      const source = rawSource ?? "row";
+      let value: string | undefined;
+      if (source === "row") {
+        value = context.row[key];
+      } else if (source === "env") {
+        value = context.env[key];
+      }
+      const safe = (value ?? "").replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+      return `'${safe}'`;
+    },
+  );
+}
+
 const FORBIDDEN_KEYWORDS = [
   "process",
   "require",
@@ -57,7 +83,9 @@ export function evaluateCondition(
     return true;
   }
 
-  preCheckExpression(expression);
+  const expanded = expandTemplates(expression, context);
+
+  preCheckExpression(expanded);
 
   const rawSandbox = Object.create(null) as Record<string, unknown>;
   rawSandbox.row = { ...context.row };
@@ -66,10 +94,23 @@ export function evaluateCondition(
   const sandbox = vm.createContext(rawSandbox);
 
   try {
-    const result = vm.runInContext(expression, sandbox, { timeout: 100 });
+    const result = vm.runInContext(expanded, sandbox, { timeout: 100 });
     return Boolean(result);
-  } catch {
-    // Timeout or syntax error — treat as false
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+
+    // Syntax errors are thrown — a broken condition should not silently skip.
+    if (msg.includes("SyntaxError") || msg.includes("Unexpected")) {
+      throw new Error(
+        `Condition evaluation failed for "${expression}": ${msg}`,
+      );
+    }
+
+    // Runtime errors (TypeError on undefined access, etc.) log a warning
+    // and return false for backward compatibility with existing pipelines.
+    console.warn(
+      `Warning: condition "${expression}" threw at runtime: ${msg} — treating as false`,
+    );
     return false;
   }
 }

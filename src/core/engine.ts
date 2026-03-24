@@ -1,4 +1,6 @@
 import vm from "node:vm";
+import { sortActionsByDependency } from "./action-deps.js";
+import { executeAiAction } from "./ai.js";
 import { evaluateCondition, preCheckExpression } from "./condition.js";
 import { executeExecAction } from "./exec.js";
 import { extractValue } from "./extractor.js";
@@ -14,6 +16,7 @@ import {
 import type {
   Action,
   Adapter,
+  AiAction,
   CellUpdate,
   ExecAction,
   ExecutionContext,
@@ -235,10 +238,11 @@ export async function runPipeline(
     }
   };
 
-  // Determine which actions to run
-  const actions: Action[] = actionFilter
+  // Determine which actions to run, sorted by dependency order
+  const filteredActions: Action[] = actionFilter
     ? config.actions.filter((s) => s.id === actionFilter)
     : config.actions;
+  const actions = sortActionsByDependency(filteredActions);
 
   // Determine which data row indices to process
   const rowIndices: number[] = [];
@@ -321,8 +325,23 @@ export async function runPipeline(
       if (signal?.aborted) break;
 
       try {
-        // Skip if target cell already has a value
-        if (row[action.target] !== undefined && row[action.target] !== "") {
+        // Skip if target cell already has a value (for multi-output AI
+        // actions, skip only if ALL target columns are filled)
+        if (action.type === "ai" && (action as AiAction).outputs) {
+          const outputs = (action as AiAction).outputs!;
+          // Check all output columns AND the primary target column
+          const columnsToCheck = [...Object.keys(outputs), action.target];
+          const allFilled = columnsToCheck.every(
+            (col) => row[col] !== undefined && row[col] !== "",
+          );
+          if (allFilled) {
+            options.onActionComplete?.(i, action.id, null);
+            continue;
+          }
+        } else if (
+          row[action.target] !== undefined &&
+          row[action.target] !== ""
+        ) {
           options.onActionComplete?.(i, action.id, null);
           continue;
         }
@@ -331,6 +350,15 @@ export async function runPipeline(
         if (!evaluateCondition(action.when, context)) {
           options.onActionComplete?.(i, action.id, null);
           continue;
+        }
+
+        // Apply per-action delay if configured (clamped to 600s max)
+        const rawDelay = (action as { runSettings?: { delay?: number } })
+          .runSettings?.delay;
+        const actionDelay =
+          rawDelay && rawDelay > 0 ? Math.min(rawDelay, 600) : 0;
+        if (actionDelay > 0) {
+          await new Promise((r) => setTimeout(r, actionDelay * 1000));
         }
 
         let value: string | null = null;
@@ -390,15 +418,46 @@ export async function runPipeline(
             extract: sa.extract,
             onError: sa.onError,
           });
+        } else if (action.type === "ai") {
+          // AI action returns CellUpdate[] directly (multi-column capable)
+          const aiUpdates = await executeAiAction(action as AiAction, context, {
+            signal,
+            rowIndex: i,
+            columnMap: options.columnMap,
+          });
+
+          // Update in-memory row for all AI output columns
+          for (const upd of aiUpdates) {
+            row[upd.column] = upd.value;
+            // Also set by ID if columnMap maps to this column name
+            if (options.columnMap) {
+              for (const [id, name] of Object.entries(options.columnMap)) {
+                if (name === upd.column) row[id] = upd.value;
+              }
+            }
+          }
+
+          rowUpdates.push(...aiUpdates);
+          options.onActionComplete?.(
+            i,
+            action.id,
+            aiUpdates.length > 0
+              ? aiUpdates.map((u) => u.value).join("; ")
+              : null,
+          );
+          continue; // Skip the single-value handling below
         }
 
         if (value !== null) {
-          // Update in-memory row so subsequent actions see new values (ID-keyed)
+          // Update in-memory row so subsequent actions see new values.
+          // Set both the ID key and the header-name alias so later actions
+          // see the updated value regardless of which key they reference.
           row[action.target] = value;
-
-          // Resolve target ID to column name for sheet write
           const columnName =
             options.columnMap?.[action.target] ?? action.target;
+          if (columnName !== action.target) {
+            row[columnName] = value;
+          }
 
           // Sheet row = data index + 2 (row 1 is headers)
           rowUpdates.push({
