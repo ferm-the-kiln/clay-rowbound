@@ -65,6 +65,10 @@ async function executePipelineRun(
   const resolvedConfig = {
     ...reconciled.config,
     actions: tabConfig.actions,
+    scripts: {
+      ...(reconciled.config.scripts || {}),
+      ...(tabConfig.scripts || {}),
+    },
     settings: { ...reconciled.config.settings, ...(tabConfig.settings || {}) },
   };
 

@@ -131,6 +131,10 @@ export function registerRun(program: Command): void {
           const resolvedConfig = {
             ...reconciled.config,
             actions: tabConfig.actions,
+            scripts: {
+              ...(reconciled.config.scripts || {}),
+              ...(tabConfig.scripts || {}),
+            },
             settings: {
               ...reconciled.config.settings,
               ...(tabConfig.settings || {}),

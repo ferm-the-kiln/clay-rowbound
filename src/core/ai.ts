@@ -97,10 +97,10 @@ export async function executeAiAction(
 
   let command: string;
   if (action.runtime === "claude") {
-    // claude -p reads prompt from stdin — safe since stdin is not shell-interpreted
-    command = action.outputs
-      ? `cat "${tmpFile}" | claude -p --output-format json`
-      : `cat "${tmpFile}" | claude -p`;
+    // claude -p reads prompt from stdin — safe since stdin is not shell-interpreted.
+    // Don't use --output-format json as it wraps the response in a metadata envelope
+    // that interferes with JSON parsing of the AI's actual output.
+    command = `cat "${tmpFile}" | claude -p`;
   } else {
     // codex exec — pipe prompt via stdin to avoid shell injection from prompt content.
     // The $(cat ...) pattern is unsafe because prompt content would be shell-interpreted.
