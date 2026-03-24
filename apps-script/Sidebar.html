@@ -1300,25 +1300,6 @@ function showSettings() {
     '</select>');
   h += '</div>';
 
-  // Scripts section — manage reusable code blocks
-  h += '<div class="section"><div class="section-title">Scripts</div>';
-  var scripts = getScripts();
-  var scriptNames = Object.keys(scripts);
-  if (scriptNames.length === 0) {
-    h += '<p class="field-hint">No scripts configured. Scripts are reusable code blocks referenced by script actions and sources.</p>';
-  } else {
-    for (var si = 0; si < scriptNames.length; si++) {
-      var sn = scriptNames[si];
-      var scr = scripts[sn];
-      h += '<div class="action-item" onclick="editScript(\'' + esc(sn).replace(/'/g, "\\'") + '\')">';
-      h += '<div class="action-item-header">';
-      h += '<span class="badge badge-script">' + esc(scr.runtime || 'bash') + '</span>';
-      h += '<span class="action-item-title">' + esc(sn) + '</span>';
-      h += '</div></div>';
-    }
-  }
-  h += '<button class="btn btn-text" style="margin-top:4px" onclick="showCreateScript()">+ New Script</button>';
-  h += '</div>';
 
   safeSetHTML(document.getElementById('content'), h);
   renderFooter([
