@@ -110,6 +110,20 @@ function loadConfig() {
     try { return JSON.parse(cached); } catch (e) { /* fall through to API */ }
   }
 
+  return loadConfigFromApi_(ssId, cache, cacheKey);
+}
+
+/** Bypasses the cache and reads config directly from Developer Metadata.
+ *  Used by the sidebar polling loop to detect external changes (e.g. CLI). */
+function loadConfigFresh() {
+  var ssId = SpreadsheetApp.getActiveSpreadsheet().getId();
+  var cacheKey = 'rb_config_' + ssId;
+  var cache = CacheService.getUserCache();
+  return loadConfigFromApi_(ssId, cache, cacheKey);
+}
+
+/** Internal: fetch config from the Sheets Developer Metadata API and update cache. */
+function loadConfigFromApi_(ssId, cache, cacheKey) {
   try {
     var result = Sheets.Spreadsheets.DeveloperMetadata.search({
       dataFilters: [{

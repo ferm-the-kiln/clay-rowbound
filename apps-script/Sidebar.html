@@ -2391,7 +2391,43 @@ function init() {
   });
 }
 
-document.addEventListener('DOMContentLoaded', init);
+document.addEventListener('DOMContentLoaded', function() {
+  init();
+  // Poll for external config changes (CLI, MCP, etc.) every 10s
+  setInterval(pollConfigChanges, 10000);
+});
+
+/** Re-render the current list view (overview/sources/settings). */
+function refreshCurrentView() {
+  switch (state.view) {
+    case 'overview': showOverview(); break;
+    case 'sources': showSources(); break;
+    case 'settings': showSettings(); break;
+    // Don't refresh edit forms — user may be mid-edit
+  }
+}
+
+/** Poll for config changes made outside the sidebar (CLI, MCP server, etc.).
+ *  Skips polling when the user is editing an action/source/script to avoid
+ *  clobbering in-flight form state. */
+function pollConfigChanges() {
+  // Don't poll while user is in an edit form
+  if (state.editingAction || state.editingSource || state.editingScript) return;
+
+  serverCall('loadConfigFresh', undefined, function(err, freshConfig) {
+    if (err || !freshConfig) return;
+    var current = JSON.stringify(state.config);
+    var incoming = JSON.stringify(freshConfig);
+    if (current !== incoming) {
+      state.config = freshConfig;
+      try { sessionStorage.setItem('rb_initData', JSON.stringify({
+        config: freshConfig, columnInfo: state.columnInfo,
+        tabs: state.tabs, initialView: state.view
+      })); } catch (e) {}
+      refreshCurrentView();
+    }
+  });
+}
 </script>
 </body>
 </html>
