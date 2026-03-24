@@ -11,7 +11,8 @@ import { cleanupOrphanedRanges, reconcile } from "../core/reconcile.js";
 import { createRunState } from "../core/run-state.js";
 import { createRunTracker } from "../core/run-tracker.js";
 import { safeCompare } from "../core/safe-compare.js";
-import type { PipelineConfig, SheetRef } from "../core/types.js";
+import { executeWebhookSource, type SourceOptions } from "../core/source.js";
+import type { PipelineConfig, SheetRef, WebhookSource } from "../core/types.js";
 import { bold, dim, error as fmtError, warn } from "./format.js";
 
 // ---------------------------------------------------------------------------
@@ -323,7 +324,10 @@ export function registerWatch(program: Command): void {
               return;
             }
 
-            if (req.method !== "POST" || req.url !== "/webhook") {
+            // Route: POST /webhook or POST /webhook/<sourceId>
+            const url = req.url ?? "";
+            const webhookMatch = url.match(/^\/webhook(?:\/([^/?]+))?/);
+            if (req.method !== "POST" || !webhookMatch) {
               res.writeHead(404, { "Content-Type": "application/json" });
               res.end(JSON.stringify({ error: "Not found" }));
               return;
@@ -361,82 +365,99 @@ export function registerWatch(program: Command): void {
               return;
             }
 
-            // If body contains row data, write it to the sheet
-            if (body && typeof body === "object" && !Array.isArray(body)) {
-              const rowData = body as Record<string, unknown>;
-              if (Object.keys(rowData).length > 0) {
-                try {
-                  const MAX_CELL_LENGTH = 50_000;
-                  const headers = await adapter.getHeaders(ref);
-                  const headerSet = new Set(headers);
-                  const rows = await adapter.readRows(ref);
-                  const nextRow = rows.length + 2; // +2 because row 1 is headers, data starts at 2
-                  const updates: {
-                    row: number;
-                    column: string;
-                    value: string;
-                  }[] = [];
+            // Resolve the webhook source from config
+            const freshConfig = await adapter.readConfig(ref);
+            const activeConfig = freshConfig ?? config!;
+            const tabSources =
+              (activeConfig.tabs
+                ? Object.values(activeConfig.tabs).find(
+                    (t) => t.name === opts.tab,
+                  )?.sources
+                : activeConfig.sources) ?? [];
+            const webhookSources = tabSources.filter(
+              (s) => s.type === "webhook",
+            ) as WebhookSource[];
 
-                  for (const h of headers) {
-                    if (!(h in rowData)) continue;
-                    const val = rowData[h];
-                    // Skip fields not matching known column headers
-                    if (!headerSet.has(h)) continue;
-                    // Type check: only allow strings and numbers
-                    if (typeof val !== "string" && typeof val !== "number") {
-                      continue;
-                    }
-                    const strVal = String(val);
-                    // Size check: Google Sheets cell limit
-                    if (strVal.length > MAX_CELL_LENGTH) continue;
-                    updates.push({
-                      row: nextRow,
-                      column: h,
-                      value: strVal,
-                    });
-                  }
-
-                  if (updates.length > 0) {
-                    await adapter.writeBatch(ref, updates);
-                  }
-                } catch (error) {
-                  const msg =
-                    error instanceof Error ? error.message : String(error);
-                  console.error(`[${timestamp()}] Webhook write error: ${msg}`);
-                }
+            const requestedId = webhookMatch[1]
+              ? decodeURIComponent(webhookMatch[1])
+              : undefined;
+            let source: WebhookSource | undefined;
+            if (requestedId) {
+              source = webhookSources.find((s) => s.id === requestedId);
+              if (!source) {
+                res.writeHead(404, { "Content-Type": "application/json" });
+                res.end(
+                  JSON.stringify({
+                    error: `Webhook source "${requestedId}" not found`,
+                  }),
+                );
+                return;
               }
+            } else if (webhookSources.length === 1) {
+              source = webhookSources[0];
+            } else if (webhookSources.length === 0) {
+              res.writeHead(404, { "Content-Type": "application/json" });
+              res.end(
+                JSON.stringify({ error: "No webhook sources configured" }),
+              );
+              return;
+            } else {
+              res.writeHead(400, { "Content-Type": "application/json" });
+              res.end(
+                JSON.stringify({
+                  error:
+                    "Multiple webhook sources configured. Specify one: POST /webhook/<sourceId>",
+                  sources: webhookSources.map((s) => s.id),
+                }),
+              );
+              return;
             }
 
-            // Trigger pipeline run immediately
+            // Execute through source mappings (handles column mapping, dedup, etc.)
             console.log(
-              `[${timestamp()}] Webhook received, running pipeline...`,
+              `[${timestamp()}] Webhook received for source "${source!.id}", processing...`,
             );
             try {
-              const result = await runOnce();
-              if (result) {
-                res.writeHead(200, { "Content-Type": "application/json" });
-                res.end(
-                  JSON.stringify({
-                    ok: true,
-                    processedRows: result.processedRows,
-                    updates: result.updates,
-                    errors: result.errors.length,
-                  }),
-                );
-              } else {
-                // Pipeline already running
-                res.writeHead(200, { "Content-Type": "application/json" });
-                res.end(
-                  JSON.stringify({
-                    ok: true,
-                    message: "Pipeline already in progress, skipped.",
-                  }),
-                );
+              const env = buildSafeEnv(activeConfig);
+              const sourceOpts: SourceOptions = {
+                adapter,
+                ref,
+                env,
+                signal: controller.signal,
+              };
+              const sourceResult = await executeWebhookSource(
+                source!,
+                body,
+                sourceOpts,
+              );
+
+              // Also trigger pipeline run for any actions
+              let pipelineResult: RunResult | null = null;
+              if (hasActions) {
+                pipelineResult = await runOnce();
               }
+
+              res.writeHead(200, { "Content-Type": "application/json" });
+              res.end(
+                JSON.stringify({
+                  ok: true,
+                  source: source!.id,
+                  rowsCreated: sourceResult.rowsCreated,
+                  rowsUpdated: sourceResult.rowsUpdated,
+                  rowsSkipped: sourceResult.rowsSkipped,
+                  errors: sourceResult.errors.length,
+                  pipeline: pipelineResult
+                    ? {
+                        processedRows: pipelineResult.processedRows,
+                        updates: pipelineResult.updates,
+                      }
+                    : null,
+                }),
+              );
             } catch (error) {
               const msg =
                 error instanceof Error ? error.message : String(error);
-              console.error(`[${timestamp()}] Webhook pipeline error: ${msg}`);
+              console.error(`[${timestamp()}] Webhook error: ${msg}`);
               res.writeHead(500, { "Content-Type": "application/json" });
               res.end(JSON.stringify({ error: msg }));
             }
