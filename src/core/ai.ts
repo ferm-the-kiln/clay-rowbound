@@ -107,15 +107,16 @@ export async function executeAiAction(
 
   let command: string;
   if (action.runtime === "claude") {
-    // claude -p reads prompt from stdin — safe since stdin is not shell-interpreted.
-    command = `cat "${tmpFile}" | claude -p`;
+    // Read prompt from temp file, pass as argument via $(...), redirect stdin
+    // from /dev/null so interactive tools (browser, etc.) work properly.
+    command = `claude -p`;
     if (action.model) command += ` --model ${action.model}`;
     const maxTurns = action.maxTurns ?? 25;
     command += ` --max-turns ${maxTurns}`;
     if (action.tools !== false) command += " --tools default";
-    command += " --no-session-persistence";
+    command += ` --no-session-persistence --disable-slash-commands "$(cat '${tmpFile.replace(/'/g, "'\\''")}')" < /dev/null`;
   } else {
-    // codex exec — pipe prompt via stdin to avoid shell injection from prompt content.
+    // codex exec — pipe prompt via stdin
     command = `cat "${tmpFile}" | codex exec --stdin -s read-only`;
     if (action.model) command += ` --model ${action.model}`;
   }
