@@ -105,15 +105,39 @@ export async function executeAiAction(
   );
   writeFileSync(tmpFile, prompt, "utf-8");
 
+  // If action has PLAYWRIGHT_HEADLESS=true in env, create an MCP config
+  // that launches Playwright in headless mode
+  let mcpConfigFile: string | undefined;
+  const actionEnv = (action as { env?: Record<string, string> }).env;
+  if (actionEnv?.PLAYWRIGHT_HEADLESS === "true") {
+    mcpConfigFile = join(
+      tmpdir(),
+      `rowbound-mcp-${Date.now()}-${Math.random().toString(36).slice(2)}.json`,
+    );
+    writeFileSync(
+      mcpConfigFile,
+      JSON.stringify({
+        mcpServers: {
+          playwright: {
+            command: "npx",
+            args: ["@playwright/mcp@latest", "--headless"],
+          },
+        },
+      }),
+      "utf-8",
+    );
+  }
+
   let command: string;
   if (action.runtime === "claude") {
     // Read prompt from temp file, pass as argument via $(...), redirect stdin
     // from /dev/null so interactive tools (browser, etc.) work properly.
-    command = `claude -p`;
+    command = "claude -p";
     if (action.model) command += ` --model ${action.model}`;
     const maxTurns = action.maxTurns ?? 25;
     command += ` --max-turns ${maxTurns}`;
     if (action.tools !== false) command += " --tools default";
+    if (mcpConfigFile) command += ` --mcp-config "${mcpConfigFile}"`;
     command += ` --no-session-persistence --disable-slash-commands "$(cat '${tmpFile.replace(/'/g, "'\\''")}')" < /dev/null`;
   } else {
     // codex exec — pipe prompt via stdin
@@ -136,11 +160,14 @@ export async function executeAiAction(
       env: aiEnv,
     });
 
-    // Clean up temp file
+    // Clean up temp files
     try {
       unlinkSync(tmpFile);
-    } catch {
-      // Best-effort cleanup
+    } catch {}
+    if (mcpConfigFile) {
+      try {
+        unlinkSync(mcpConfigFile);
+      } catch {}
     }
 
     // Handle non-zero exit code
@@ -213,11 +240,14 @@ export async function executeAiAction(
       },
     ];
   } catch (error) {
-    // Clean up temp file on error
+    // Clean up temp files on error
     try {
       unlinkSync(tmpFile);
-    } catch {
-      // Best-effort cleanup
+    } catch {}
+    if (mcpConfigFile) {
+      try {
+        unlinkSync(mcpConfigFile);
+      } catch {}
     }
 
     // Check for specific error types
