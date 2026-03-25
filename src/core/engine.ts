@@ -327,13 +327,13 @@ export async function runPipeline(
       try {
         // Skip if target cell already has a value
         if (row[action.target] !== undefined && row[action.target] !== "") {
-          options.onActionComplete?.(i, action.id, null);
+          options.onActionComplete?.(i, action.id, "__SKIPPED__");
           continue;
         }
 
         // Evaluate `when` condition
         if (!evaluateCondition(action.when, context)) {
-          options.onActionComplete?.(i, action.id, null);
+          options.onActionComplete?.(i, action.id, "__SKIPPED__");
           continue;
         }
 

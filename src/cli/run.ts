@@ -242,10 +242,12 @@ export function registerRun(program: Command): void {
             onActionComplete: (rowIndex, actionId, value) => {
               tracker.onActionComplete(rowIndex, actionId, value);
               if (!quietMode) {
-                if (value !== null) {
+                if (value === "__SKIPPED__") {
+                  log(`  ${dim("-")} ${actionId}: ${dim("skipped")}`);
+                } else if (value !== null) {
                   log(`  ${success("\u2713")} ${actionId}: ${value}`);
                 } else {
-                  log(`  ${dim("-")} ${actionId}: ${warn("skipped")}`);
+                  log(`  ${dim("~")} ${actionId}: ${dim("no result")}`);
                 }
               }
             },

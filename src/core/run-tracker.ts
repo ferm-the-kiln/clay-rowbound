@@ -26,10 +26,10 @@ export function createRunTracker(state: RunState): {
       const action = state.actionSummaries.find((s) => s.actionId === actionId);
       if (!action) return;
 
-      if (value !== null) {
-        action.success++;
-      } else {
+      if (value === "__SKIPPED__" || value === null) {
         action.skipped++;
+      } else {
+        action.success++;
       }
     },
 
