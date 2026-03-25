@@ -259,8 +259,11 @@ export async function runPipeline(
   };
 
   // Determine which actions to run, sorted by dependency order
-  const filteredActions: Action[] = actionFilter
-    ? config.actions.filter((s) => s.id === actionFilter)
+  const actionFilterSet = actionFilter
+    ? new Set(actionFilter.split(","))
+    : null;
+  const filteredActions: Action[] = actionFilterSet
+    ? config.actions.filter((s) => actionFilterSet.has(s.id))
     : config.actions;
   const actions = sortActionsByDependency(filteredActions);
 

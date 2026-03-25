@@ -2,6 +2,7 @@ import type { Command } from "commander";
 import { SheetsAdapter } from "../adapters/sheets/sheets-adapter.js";
 import { runPipeline } from "../core/engine.js";
 import { buildSafeEnv } from "../core/env.js";
+import { parseColumnSpec, parseRowSpec } from "../core/range-parser.js";
 import { cleanupOrphanedRanges, reconcile } from "../core/reconcile.js";
 import { createRunState } from "../core/run-state.js";
 import { createRunTracker } from "../core/run-tracker.js";
@@ -13,8 +14,14 @@ export function registerRun(program: Command): void {
     .description("Run the enrichment pipeline")
     .argument("<sheetId>", "Google Sheets spreadsheet ID")
     .option("--tab <name>", "Sheet tab name", "Sheet1")
-    .option("--rows <range>", "Row range to process (e.g. 2-50)")
-    .option("--action <id>", "Run only a specific action")
+    .option(
+      "--rows <spec>",
+      "Rows to process (e.g. 2-50, 2,5,8, or 2-5,8,10-12)",
+    )
+    .option(
+      "--columns <spec>",
+      "Column letters to process (e.g. A-C, A,C,E, or A-C,E,G-J)",
+    )
     .option("--dry-run", "Dry run — compute but do not write back", false)
     .option("--json", "Output result as JSON")
     .option("-q, --quiet", "Suppress per-row output, show only final summary")
@@ -24,7 +31,7 @@ export function registerRun(program: Command): void {
         opts: {
           tab: string;
           rows?: string;
-          action?: string;
+          columns?: string;
           dryRun: boolean;
           json: boolean;
           quiet: boolean;
@@ -92,40 +99,74 @@ export function registerRun(program: Command): void {
             return;
           }
 
-          const isRange = opts.rows ? /^\d+-\d+$/.test(opts.rows) : false;
-          const isList = opts.rows ? /^\d+(,\d+)*$/.test(opts.rows) : false;
-
-          if (opts.rows && !isRange && !isList) {
-            logErr(
-              `${error("Invalid --rows format.")} Expected range (e.g. 2-50) or comma-separated rows (e.g. 100,200,300).`,
-            );
-            process.exitCode = 1;
-            return;
-          }
-
-          if (opts.rows && isRange) {
-            const [startStr, endStr] = opts.rows.split("-");
-            const start = parseInt(startStr!, 10);
-            const end = parseInt(endStr!, 10);
-            if (start > end) {
+          // Parse --rows spec
+          let rowSet: Set<number> | undefined;
+          if (opts.rows) {
+            try {
+              rowSet = new Set(
+                [...parseRowSpec(opts.rows)].map((r) => r - 2), // sheet row 2 = data index 0
+              );
+            } catch (err) {
               logErr(
-                `${error("Invalid --rows range.")} Start (${start}) must be <= end (${end}).`,
+                error(
+                  err instanceof Error ? err.message : "Invalid --rows format.",
+                ),
               );
               process.exitCode = 1;
               return;
             }
           }
 
-          if (
-            opts.action &&
-            !tabConfig.actions.some((s) => s.id === opts.action)
-          ) {
-            logErr(
-              error(`Action "${opts.action}" not found.`) +
-                ` Available: ${tabConfig.actions.map((s) => s.id).join(", ")}`,
-            );
-            process.exitCode = 1;
-            return;
+          // Parse --columns spec and resolve to action IDs
+          let actionFilter: string | undefined;
+          let columnFilterLabel: string | undefined;
+          if (opts.columns) {
+            try {
+              const colLetters = parseColumnSpec(opts.columns);
+              columnFilterLabel = [...colLetters].join(",");
+              // Build reverse map: column letter → column ID → action targets
+              const headers = await adapter.getHeaders(ref);
+              const colIdsToRun = new Set<string>();
+              for (const letter of colLetters) {
+                let colIdx = 0;
+                for (let i = 0; i < letter.length; i++) {
+                  colIdx = colIdx * 26 + (letter.charCodeAt(i) - 64);
+                }
+                colIdx -= 1; // 0-based
+                const headerName = headers[colIdx];
+                if (!headerName) continue;
+                // Find the column ID for this header name
+                for (const [id, name] of Object.entries(tabConfig.columns)) {
+                  if (name === headerName) {
+                    colIdsToRun.add(id);
+                    break;
+                  }
+                }
+              }
+              // Filter actions to only those targeting these columns
+              const matchingActions = tabConfig.actions.filter((a) =>
+                colIdsToRun.has(a.target),
+              );
+              if (matchingActions.length === 0) {
+                logErr(
+                  error(`No actions target columns ${columnFilterLabel}.`),
+                );
+                process.exitCode = 1;
+                return;
+              }
+              // Use action IDs as filter
+              actionFilter = matchingActions.map((a) => a.id).join(",");
+            } catch (err) {
+              logErr(
+                error(
+                  err instanceof Error
+                    ? err.message
+                    : "Invalid --columns format.",
+                ),
+              );
+              process.exitCode = 1;
+              return;
+            }
           }
 
           const resolvedConfig = {
@@ -141,18 +182,7 @@ export function registerRun(program: Command): void {
             },
           };
 
-          // Convert CLI row format to engine format
-          let range: string | undefined;
-          let rowSet: Set<number> | undefined;
-
-          if (opts.rows && isList) {
-            // Comma-separated rows: convert sheet rows to 0-based data indices
-            rowSet = new Set(
-              opts.rows.split(",").map((s) => parseInt(s, 10) - 2), // sheet row 2 = data index 0
-            );
-          } else if (opts.rows && isRange) {
-            range = opts.rows.replace("-", ":");
-          }
+          // No separate range var needed — rowSet handles all cases now
 
           // Build filtered env (only ROWBOUND_*, referenced {{env.X}}, NODE_ENV, PATH)
           const env = buildSafeEnv(resolvedConfig);
@@ -182,8 +212,7 @@ export function registerRun(program: Command): void {
             config: resolvedConfig,
             totalRows: 0, // Will be set after runPipeline returns
             dryRun: opts.dryRun,
-            range,
-            actionFilter: opts.action,
+            actionFilter,
           });
           const tracker = createRunTracker(state);
 
@@ -192,8 +221,8 @@ export function registerRun(program: Command): void {
           }
 
           log(`Running pipeline on sheet ${dim(sheetId)}...`);
-          if (opts.action) {
-            log(`Filtering to action: ${bold(opts.action)}`);
+          if (columnFilterLabel) {
+            log(`Columns: ${bold(columnFilterLabel)}`);
           }
           if (opts.rows) {
             log(`Rows: ${bold(opts.rows)}`);
@@ -209,9 +238,8 @@ export function registerRun(program: Command): void {
             ref,
             config: resolvedConfig,
             env,
-            range,
             rowSet,
-            actionFilter: opts.action,
+            actionFilter,
             dryRun: opts.dryRun,
             signal: controller.signal,
             columnMap: tabConfig.columns,
