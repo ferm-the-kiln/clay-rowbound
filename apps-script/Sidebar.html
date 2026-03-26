@@ -23,6 +23,11 @@ body {
   height: 100vh;
   overflow: hidden;
 }
+#app-scroll {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
 
 /* ═══════════════════════════════════════════════════════════════════════════
    LAYOUT
@@ -56,11 +61,7 @@ body {
   background: #fff;
 }
 #content {
-  flex: 1;
-  overflow-y: auto;
-  overflow-x: hidden;
   padding: 16px;
-  min-height: 0; /* allow flex child to shrink and scroll */
 }
 #footer {
   padding: 10px 16px;
@@ -393,9 +394,7 @@ body {
 /* Tab bar */
 #tab-bar {
   display: block;
-  border-bottom: 1px solid #dadce0;
   background: #fff;
-  flex-shrink: 0;
 }
 .tab-btn {
   flex: 1;
@@ -420,37 +419,39 @@ body {
 <body>
 
 <div id="app">
-  <div id="header"></div>
-  <div id="sheet-tab-selector" style="padding:10px 16px;display:none">
-    <div style="display:flex;align-items:center;margin-bottom:6px">
-      <span style="font-size:15px;color:#202124;font-weight:600;flex:1">Sheet</span>
-      <button onclick="refreshAll()" title="Refresh" id="refresh-btn" style="font-size:14px;padding:4px 10px;cursor:pointer;color:#5f6368;background:#fff;border:1px solid #dadce0;border-radius:4px">&#8635; Sync</button>
+  <div id="app-scroll">
+    <div id="header"></div>
+    <div id="sheet-tab-selector" style="padding:10px 16px;display:none">
+      <div style="display:flex;align-items:center;margin-bottom:6px">
+        <span style="font-size:15px;color:#202124;font-weight:600;flex:1">Sheet</span>
+        <button onclick="refreshAll()" title="Refresh" id="refresh-btn" style="font-size:14px;padding:4px 10px;cursor:pointer;color:#5f6368;background:#fff;border:1px solid #dadce0;border-radius:4px">&#8635; Sync</button>
+      </div>
+      <select id="sheet-tab-select" class="field-select" style="width:100%;font-weight:500" onchange="onSheetTabSelect(this.value)">
+        <option value="">Loading...</option>
+      </select>
     </div>
-    <select id="sheet-tab-select" class="field-select" style="width:100%;font-weight:500" onchange="onSheetTabSelect(this.value)">
-      <option value="">Loading...</option>
-    </select>
-  </div>
-  <div id="tab-bar" style="display:none;padding:0 16px 8px">
-    <div style="font-size:15px;color:#202124;font-weight:600;margin-bottom:6px">View</div>
-    <select id="view-select" class="field-select" style="width:100%;font-weight:500" onchange="switchTab(this.value)">
-      <option value="overview">Actions</option>
-      <option value="sources">Sources</option>
-      <option value="settings">Settings</option>
-    </select>
-  </div>
-  <div id="column-selector" style="display:none;padding:0 16px 8px;border-bottom:1px solid #dadce0;flex-shrink:0">
-    <div style="font-size:15px;color:#202124;font-weight:600;margin-bottom:6px">Column</div>
-    <select id="action-col-select" class="field-select" style="width:100%;font-weight:500" onchange="onActionColumnChange(this.value)">
-      <option value="">Select a column...</option>
-    </select>
-  </div>
-  <div id="content">
-    <div style="padding: 16px;">
-      <div class="skeleton" style="height:32px;width:50%;margin-bottom:16px;border-radius:6px"></div>
-      <div class="skeleton skeleton-card"></div>
-      <div class="skeleton skeleton-card"></div>
-      <div class="skeleton skeleton-card"></div>
-      <div class="skeleton skeleton-card"></div>
+    <div id="tab-bar" style="display:none;padding:0 16px 8px">
+      <div style="font-size:15px;color:#202124;font-weight:600;margin-bottom:6px">View</div>
+      <select id="view-select" class="field-select" style="width:100%;font-weight:500" onchange="switchTab(this.value)">
+        <option value="overview">Actions</option>
+        <option value="sources">Sources</option>
+        <option value="settings">Settings</option>
+      </select>
+    </div>
+    <div id="column-selector" style="display:none;padding:0 16px 8px">
+      <div style="font-size:15px;color:#202124;font-weight:600;margin-bottom:6px">Column</div>
+      <select id="action-col-select" class="field-select" style="width:100%;font-weight:500" onchange="onActionColumnChange(this.value)">
+        <option value="">Select a column...</option>
+      </select>
+    </div>
+    <div id="content">
+      <div style="padding: 16px;">
+        <div class="skeleton" style="height:32px;width:50%;margin-bottom:16px;border-radius:6px"></div>
+        <div class="skeleton skeleton-card"></div>
+        <div class="skeleton skeleton-card"></div>
+        <div class="skeleton skeleton-card"></div>
+        <div class="skeleton skeleton-card"></div>
+      </div>
     </div>
   </div>
   <div id="footer"></div>
