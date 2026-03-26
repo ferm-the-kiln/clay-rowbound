@@ -17,6 +17,26 @@ function onOpen() {
     .addToUi();
 }
 
+// ── Tab change detection via onSelectionChange trigger ────────────────────
+// This fires automatically when the user switches sheets or changes selection.
+// We write the active tab info to PropertiesService so the sidebar can read
+// it instantly (~10ms) instead of polling the sheet API (~300ms).
+
+function onSelectionChange(e) {
+  try {
+    var sheet = e.source.getActiveSheet();
+    var props = PropertiesService.getUserProperties();
+    var info = JSON.stringify({
+      tabName: sheet.getName(),
+      tabGid: String(sheet.getSheetId()),
+      ts: Date.now()
+    });
+    props.setProperty('rb_active_tab', info);
+  } catch (err) {
+    // Silently ignore — trigger failures shouldn't break the spreadsheet
+  }
+}
+
 // ── Sidebar entry points ────────────────────────────────────────────────────
 
 function openColumnConfig() {
@@ -53,8 +73,6 @@ function openSidebar_() {
 
 /**
  * Single init call — returns everything the sidebar needs in one round-trip.
- * This replaces the 4 separate calls (loadConfig, getActiveColumnInfo,
- * getTabList, getInitialView) to eliminate loading latency.
  */
 function getInitData() {
   var props = PropertiesService.getUserProperties();
@@ -71,9 +89,19 @@ function getInitData() {
     : [];
   var columnName = (col <= headers.length) ? String(headers[col - 1]) : '';
 
+  // Write current tab to properties for fast polling
+  props.setProperty('rb_active_tab', JSON.stringify({
+    tabName: sheet.getName(),
+    tabGid: String(sheet.getSheetId()),
+    ts: Date.now()
+  }));
+
+  var configResult = loadConfigWithVersion_();
+
   return {
     initialView: view,
-    config: loadConfig(),
+    config: configResult.config,
+    configVersion: configResult.version,
     columnInfo: {
       column: columnName,
       columnIndex: col,
@@ -87,18 +115,33 @@ function getInitData() {
   };
 }
 
-/** Lightweight call to detect tab switches — returns only active tab info. */
-function getActiveTabInfo() {
+/**
+ * Fast poll endpoint — returns tab info from PropertiesService (~10ms)
+ * and config version for change detection. No sheet API calls.
+ */
+function pollState() {
+  var props = PropertiesService.getUserProperties();
+  var tabJson = props.getProperty('rb_active_tab');
+  var tab = tabJson ? JSON.parse(tabJson) : null;
+  var version = getConfigVersion_();
+  return { tab: tab, configVersion: version };
+}
+
+/**
+ * Called by sidebar only when config version changed — fetches full config.
+ */
+function loadConfigFull() {
+  var result = loadConfigWithVersion_();
+  return result;
+}
+
+/** Returns column headers for the active tab. Called on tab switch. */
+function getActiveTabHeaders() {
   var sheet = SpreadsheetApp.getActiveSheet();
   var lastCol = sheet.getLastColumn();
-  var headers = lastCol > 0
-    ? sheet.getRange(1, 1, 1, lastCol).getValues()[0]
-    : [];
-  return {
-    tabName: sheet.getName(),
-    tabGid: String(sheet.getSheetId()),
-    headers: headers.filter(function(h) { return h !== ''; }).map(String)
-  };
+  if (lastCol === 0) return [];
+  var headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
+  return headers.filter(function(h) { return h !== ''; }).map(String);
 }
 
 /** Returns column headers for a given tab. */
@@ -110,6 +153,31 @@ function getTabHeaders(tabName) {
 }
 
 // ── Config read/write via Developer Metadata ────────────────────────────────
+
+/**
+ * Config versioning: a simple counter stored in PropertiesService.
+ * Incremented on every saveConfig(). The sidebar polls this (~10ms)
+ * instead of fetching the full config (~1-3s) to detect changes.
+ */
+function getConfigVersion_() {
+  var props = PropertiesService.getUserProperties();
+  return parseInt(props.getProperty('rb_config_version') || '0', 10);
+}
+
+function incrementConfigVersion_() {
+  var props = PropertiesService.getUserProperties();
+  var v = parseInt(props.getProperty('rb_config_version') || '0', 10) + 1;
+  props.setProperty('rb_config_version', String(v));
+  return v;
+}
+
+/** Reads config + current version in one call. */
+function loadConfigWithVersion_() {
+  return {
+    config: loadConfig(),
+    version: getConfigVersion_()
+  };
+}
 
 /** Reads the rowbound_config from Developer Metadata with CacheService layer.
  *  Cache hit is ~10ms vs ~1-3s for the Developer Metadata REST call. */
@@ -124,15 +192,6 @@ function loadConfig() {
     try { return JSON.parse(cached); } catch (e) { /* fall through to API */ }
   }
 
-  return loadConfigFromApi_(ssId, cache, cacheKey);
-}
-
-/** Bypasses the cache and reads config directly from Developer Metadata.
- *  Used by the sidebar polling loop to detect external changes (e.g. CLI). */
-function loadConfigFresh() {
-  var ssId = SpreadsheetApp.getActiveSpreadsheet().getId();
-  var cacheKey = 'rb_config_' + ssId;
-  var cache = CacheService.getUserCache();
   return loadConfigFromApi_(ssId, cache, cacheKey);
 }
 
@@ -181,9 +240,10 @@ function saveConfig(configJson) {
     }
   } catch (e) { /* no existing config */ }
 
-  // Invalidate cache so next load is fresh
+  // Invalidate cache and bump version
   var cacheKey = 'rb_config_' + ssId;
   CacheService.getUserCache().remove(cacheKey);
+  incrementConfigVersion_();
 
   if (existingId !== null) {
     Sheets.Spreadsheets.batchUpdate({

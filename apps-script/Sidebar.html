@@ -2791,6 +2791,7 @@ function applyInitData(data) {
   state.config = data.config;
   state.columnInfo = data.columnInfo;
   state.tabs = data.tabs || [];
+  if (data.configVersion !== undefined) _knownConfigVersion = data.configVersion;
   ensureConfig();
   switch (data.initialView) {
     case 'overview': showOverview(); break;
@@ -2824,14 +2825,13 @@ function init() {
 
 document.addEventListener('DOMContentLoaded', function() {
   init();
-  // Poll for external config changes (CLI, MCP, etc.) every 10s
-  setInterval(pollConfigChanges, 10000);
-  // Poll for tab switches every 1s (lightweight call)
-  setInterval(pollActiveTab, 1000);
+  // Single fast poll loop — checks tab + config version via PropertiesService (~10ms)
+  setInterval(pollStateChanges, 1500);
 });
 
 /** Show a skeleton loading state with the new tab name so the user
  *  sees instant feedback while we fetch the tab's config. */
+/** Show a skeleton loading state with the new tab name. */
 function showTabSwitchSkeleton(tabName) {
   var content = document.getElementById('content');
   var h = '<div class="toggle-row">';
@@ -2843,41 +2843,7 @@ function showTabSwitchSkeleton(tabName) {
   h += '<div class="skeleton skeleton-card"></div>';
   h += '</div>';
   safeSetHTML(content, h);
-  // Clear footer during loading
   safeSetHTML(document.getElementById('footer'), '');
-}
-
-/** Poll for tab switches — if the user switched to a different sheet tab,
- *  instantly show a skeleton, update state, then re-render with real data.
- *  Skips during edit forms. */
-function pollActiveTab() {
-  if (state.editingAction || state.editingSource || state.editingScript) return;
-
-  serverCall('getActiveTabInfo', undefined, function(err, info) {
-    if (err || !info || !state.columnInfo) return;
-    if (info.tabGid === state.columnInfo.tabGid) return;
-
-    // Tab changed — show skeleton immediately
-    showTabSwitchSkeleton(info.tabName);
-
-    // Update state
-    state.columnInfo.tabName = info.tabName;
-    state.columnInfo.tabGid = info.tabGid;
-    state.columnInfo.headers = info.headers;
-
-    // Fetch fresh config then re-render
-    serverCall('loadConfigFresh', undefined, function(cfgErr, freshConfig) {
-      if (!cfgErr && freshConfig) {
-        state.config = freshConfig;
-        try { sessionStorage.setItem('rb_initData', JSON.stringify({
-          config: freshConfig, columnInfo: state.columnInfo,
-          tabs: state.tabs, initialView: state.view
-        })); } catch (e) {}
-      }
-      ensureConfig();
-      refreshCurrentView();
-    });
-  });
 }
 
 /** Re-render the current list view (overview/sources/settings). */
@@ -2886,28 +2852,76 @@ function refreshCurrentView() {
     case 'overview': showOverview(); break;
     case 'sources': showSources(); break;
     case 'settings': showSettings(); break;
-    // Don't refresh edit forms — user may be mid-edit
   }
 }
 
-/** Poll for config changes made outside the sidebar (CLI, MCP server, etc.).
- *  Skips polling when the user is editing an action/source/script to avoid
- *  clobbering in-flight form state. */
-function pollConfigChanges() {
-  // Don't poll while user is in an edit form
-  if (state.editingAction || state.editingSource || state.editingScript) return;
+// Track known config version to detect external changes
+var _knownConfigVersion = 0;
+var _pollInFlight = false;
 
-  serverCall('loadConfigFresh', undefined, function(err, freshConfig) {
-    if (err || !freshConfig) return;
-    var current = JSON.stringify(state.config);
-    var incoming = JSON.stringify(freshConfig);
-    if (current !== incoming) {
-      state.config = freshConfig;
-      try { sessionStorage.setItem('rb_initData', JSON.stringify({
-        config: freshConfig, columnInfo: state.columnInfo,
-        tabs: state.tabs, initialView: state.view
-      })); } catch (e) {}
-      refreshCurrentView();
+/**
+ * Single fast poll — reads tab + config version from PropertiesService (~10ms).
+ * Only fetches full config or headers when something actually changed.
+ * Replaces the old two-loop approach (pollActiveTab every 1s + pollConfigChanges every 10s).
+ */
+function pollStateChanges() {
+  if (state.editingAction || state.editingSource || state.editingScript) return;
+  if (_pollInFlight) return;
+  _pollInFlight = true;
+
+  serverCall('pollState', undefined, function(err, result) {
+    _pollInFlight = false;
+    if (err || !result || !state.columnInfo) return;
+
+    var tabChanged = result.tab && result.tab.tabGid !== state.columnInfo.tabGid;
+    var configChanged = result.configVersion !== _knownConfigVersion;
+
+    if (!tabChanged && !configChanged) return;
+
+    if (tabChanged) {
+      // Show skeleton immediately with new tab name
+      showTabSwitchSkeleton(result.tab.tabName);
+      state.columnInfo.tabName = result.tab.tabName;
+      state.columnInfo.tabGid = result.tab.tabGid;
+
+      // Fetch headers for the new tab
+      serverCall('getActiveTabHeaders', undefined, function(hErr, headers) {
+        if (!hErr && headers) {
+          state.columnInfo.headers = headers;
+        }
+
+        if (configChanged) {
+          // Also fetch fresh config
+          serverCall('loadConfigFull', undefined, function(cErr, data) {
+            if (!cErr && data) {
+              state.config = data.config;
+              _knownConfigVersion = data.version;
+              try { sessionStorage.setItem('rb_initData', JSON.stringify({
+                config: data.config, columnInfo: state.columnInfo,
+                tabs: state.tabs, initialView: state.view
+              })); } catch (e) {}
+            }
+            ensureConfig();
+            refreshCurrentView();
+          });
+        } else {
+          ensureConfig();
+          refreshCurrentView();
+        }
+      });
+    } else if (configChanged) {
+      // Only config changed (external CLI/MCP edit), no tab switch
+      serverCall('loadConfigFull', undefined, function(cErr, data) {
+        if (!cErr && data) {
+          state.config = data.config;
+          _knownConfigVersion = data.version;
+          try { sessionStorage.setItem('rb_initData', JSON.stringify({
+            config: data.config, columnInfo: state.columnInfo,
+            tabs: state.tabs, initialView: state.view
+          })); } catch (e) {}
+          refreshCurrentView();
+        }
+      });
     }
   });
 }
