@@ -85,18 +85,23 @@ Column names are automatically resolved to stable IDs when you run `rowbound syn
 ### Actions — Enrich existing rows
 - **HTTP actions** — call any REST API with templated URLs, headers, and bodies; extract values with JSONPath
 - **Waterfall actions** — try multiple providers in order until one returns a result (e.g., Clearbit → Apollo → Hunter)
-- **Transform actions** — compute derived values with sandboxed JavaScript expressions
+- **Formula actions** — compute derived values with JavaScript expressions using `{{Column Name}}` references
+- **AI actions** — run headless Claude or Codex per row with configurable model, max turns, and tools
 - **Exec actions** — run shell commands and capture stdout
 - **Script actions** — run reusable named scripts stored in config; supports bash, python3, and node runtimes
-- **Lookup actions** — pull data from other tabs by matching on a column value; cached per pipeline run
+- **Lookup actions** — pull data from other tabs (boolean, count, or full row JSON)
 - **Write actions** — push data to other tabs with column mapping; supports append, upsert, and array expansion via `expandPath`
+- **Per-action environment variables** — inject env vars per action (e.g., `PLAYWRIGHT_HEADLESS=true`)
 
 ### Pipeline
 - **Conditional execution** — skip actions per-row with `when` expressions
 - **Smart skip** — automatically skips rows where the target cell already has a value
 - **Watch mode** — poll sheets on an interval or trigger runs via webhook
-- **Column tracking** — automatic column registry that survives header renames
-- **Rate limiting** — global token-bucket rate limiter with configurable requests/second
+- **Column tracking** — stable column IDs that survive header renames and reordering
+- **`--columns` flag** — target specific columns by letter (e.g., `--columns A-C,E,AP`)
+- **`--rows` flag** — flexible row specs (e.g., `--rows 2-5,8,10-12`)
+- **Rate limiting** — configurable seconds between requests (default: 1 per second)
+- **Timeouts in seconds** — all user-facing timeouts in seconds, not milliseconds
 - **Retry with backoff** — exponential, linear, or fixed backoff on failures
 - **Structured error handling** — per-action `onError` config maps status codes to actions (skip, write fallback)
 - **MCP server** — expose all operations as Model Context Protocol tools for Claude Desktop and other AI assistants
@@ -111,7 +116,7 @@ Column names are automatically resolved to stable IDs when you run `rowbound syn
 | Command | Description |
 |---------|-------------|
 | `rowbound init <sheetId>` | Initialize a sheet with a default pipeline config |
-| `rowbound run <sheetId>` | Run the enrichment pipeline (`--dry-run`, `--rows`, `--action`) |
+| `rowbound run <sheetId>` | Run the enrichment pipeline (`--dry-run`, `--rows`, `--columns`) |
 | `rowbound status <sheetId>` | Show pipeline status and enrichment rates |
 | `rowbound watch <sheetId>` | Watch for changes and run continuously (`--interval`, `--port`) |
 | `rowbound sync <sheetId>` | Reconcile columns, validate config, fix issues |
@@ -484,7 +489,7 @@ Rowbound includes an Apps Script sidebar that lets you configure actions directl
 
 ### Supported types
 
-All action types are configurable through the sidebar: HTTP, Waterfall, Transform, Exec, Lookup, Write, and Script. All source types are also supported: HTTP, Exec, Webhook, and Script — including column mapping, dedup, schedule, and update-existing settings.
+All action types are configurable through the sidebar: HTTP, Waterfall, Formula, Exec, Lookup, Write, and Script. All source types are also supported: HTTP, Exec, Webhook, and Script — including column mapping, dedup, schedule, and update-existing settings.
 
 > **Note:** The sidebar is a config editor only — it doesn't execute the pipeline. Use `rowbound run` via the CLI to execute. The `exec` action type can be configured in the sidebar but only executes via the CLI (no shell access in Apps Script).
 

@@ -417,9 +417,12 @@ body {
     <div id="header-title"><span>Rowbound</span></div>
   </div>
   <div id="sheet-tab-selector" style="padding:6px 16px 8px">
-    <select id="sheet-tab-select" class="field-select" style="width:100%;font-weight:500" onchange="onSheetTabSelect(this.value)">
-      <option value="">Loading...</option>
-    </select>
+    <div style="display:flex;gap:6px;align-items:center">
+      <select id="sheet-tab-select" class="field-select" style="flex:1;font-weight:500" onchange="onSheetTabSelect(this.value)">
+        <option value="">Loading...</option>
+      </select>
+      <button class="btn-icon" onclick="refreshAll()" title="Refresh" id="refresh-btn" style="font-size:16px;padding:4px 6px;border:1px solid #dadce0;border-radius:4px;background:#fff;cursor:pointer">&#8635;</button>
+    </div>
   </div>
   <div id="tab-bar">
     <button class="tab-btn active" onclick="switchTab('overview')" data-tab="overview">Actions</button>
@@ -2574,6 +2577,8 @@ function persistConfig(message) {
       showToast('Error: ' + err.message, 'error');
     } else {
       showToast(message || 'Saved');
+      // Refresh config after save to stay in sync
+      refreshAll();
     }
   });
 }
@@ -2873,8 +2878,6 @@ function init() {
 
 document.addEventListener('DOMContentLoaded', function() {
   init();
-  // Single fast poll loop — checks tab + config version via PropertiesService (~10ms)
-  setInterval(pollStateChanges, 10000);
 });
 
 /** Show a skeleton loading state with the new tab name so the user
@@ -2888,44 +2891,43 @@ function refreshCurrentView() {
   }
 }
 
-// Track known config version to detect external changes
+// Track known config version
 var _knownConfigVersion = 0;
-var _pollInFlight = false;
+var _refreshing = false;
 
 /**
- * Poll for config changes only (every 10s). Tab switching is handled
- * instantly by the dropdown selector — no polling needed for that.
- * Also refreshes the tab list to detect new/renamed/deleted tabs.
+ * Refresh everything — config, tabs, headers. Called by the refresh button
+ * and automatically after save/delete operations.
  */
-function pollStateChanges() {
-  if (state.editingAction || state.editingSource || state.editingScript) return;
-  if (_pollInFlight) return;
-  _pollInFlight = true;
+function refreshAll() {
+  if (_refreshing) return;
+  _refreshing = true;
 
-  serverCall('pollState', undefined, function(err, result) {
-    _pollInFlight = false;
-    if (err || !result) return;
+  // Visual feedback — spin the refresh icon
+  var btn = document.getElementById('refresh-btn');
+  if (btn) btn.style.opacity = '0.5';
 
-    // Refresh tab list (detect new/renamed/deleted tabs)
-    if (result.tabs) {
-      state.tabs = result.tabs;
-      updateSheetTabSelector();
+  serverCall('getInitData', undefined, function(err, data) {
+    _refreshing = false;
+    if (btn) btn.style.opacity = '1';
+    if (err || !data) return;
+
+    state.config = data.config;
+    state.tabs = data.tabs || [];
+    if (data.configVersion !== undefined) _knownConfigVersion = data.configVersion;
+
+    // Update headers for current tab
+    if (data.columnInfo) {
+      state.columnInfo.headers = data.columnInfo.headers;
     }
 
-    // Check if config version changed (CLI/MCP edit)
-    if (result.configVersion === _knownConfigVersion) return;
+    updateSheetTabSelector();
+    try { sessionStorage.setItem('rb_initData', JSON.stringify(data)); } catch (e) {}
 
-    serverCall('loadConfigFull', undefined, function(cErr, data) {
-      if (!cErr && data) {
-        state.config = data.config;
-        _knownConfigVersion = data.version;
-        try { sessionStorage.setItem('rb_initData', JSON.stringify({
-          config: data.config, columnInfo: state.columnInfo,
-          tabs: state.tabs, initialView: state.view
-        })); } catch (e) {}
-        refreshCurrentView();
-      }
-    });
+    // Re-render current view if on a list view (not mid-edit)
+    if (!state.editingAction && !state.editingSource && !state.editingScript) {
+      refreshCurrentView();
+    }
   });
 }
 </script>
