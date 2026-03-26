@@ -315,96 +315,6 @@ describe("validateConfig", () => {
     expect(result.errors).toHaveLength(0);
   });
 
-  it("detects invalid template syntax in url", () => {
-    const config = validConfig({
-      actions: [
-        {
-          id: "bad_tmpl",
-          type: "http",
-          target: "Col",
-          method: "GET",
-          url: "https://api.com/{{invalid}}",
-          extract: "$.x",
-        },
-      ],
-    });
-    const result = validateConfig(config);
-    expect(result.valid).toBe(false);
-    expect(result.errors).toContainEqual(
-      expect.stringContaining("invalid template"),
-    );
-    expect(result.errors).toContainEqual(
-      expect.stringContaining("{{invalid}}"),
-    );
-  });
-
-  it("detects invalid template syntax in headers", () => {
-    const config = validConfig({
-      actions: [
-        {
-          id: "bad_hdr",
-          type: "http",
-          target: "Col",
-          method: "GET",
-          url: "https://api.com/test",
-          headers: { Auth: "{{badvar}}" },
-          extract: "$.x",
-        },
-      ],
-    });
-    const result = validateConfig(config);
-    expect(result.valid).toBe(false);
-    expect(result.errors).toContainEqual(
-      expect.stringContaining("invalid template"),
-    );
-  });
-
-  it("detects invalid template syntax in body", () => {
-    const config = validConfig({
-      actions: [
-        {
-          id: "bad_body",
-          type: "http",
-          target: "Col",
-          method: "POST",
-          url: "https://api.com/test",
-          body: { nested: { value: "{{foo.bar.baz}}" } },
-          extract: "$.x",
-        },
-      ],
-    });
-    const result = validateConfig(config);
-    expect(result.valid).toBe(false);
-    expect(result.errors).toContainEqual(
-      expect.stringContaining("invalid template"),
-    );
-  });
-
-  it("detects invalid templates in waterfall provider urls", () => {
-    const config = validConfig({
-      actions: [
-        {
-          id: "wf_tmpl",
-          type: "waterfall",
-          target: "Col",
-          providers: [
-            {
-              name: "prov1",
-              method: "GET",
-              url: "https://api.com/{{nope}}",
-              extract: "$.x",
-            },
-          ],
-        },
-      ],
-    });
-    const result = validateConfig(config);
-    expect(result.valid).toBe(false);
-    expect(result.errors).toContainEqual(
-      expect.stringContaining("invalid template"),
-    );
-  });
-
   // -------------------------------------------------------------------------
   // Condition parsing
   // -------------------------------------------------------------------------
@@ -682,25 +592,6 @@ describe("validateConfig", () => {
     expect(result.errors).toContainEqual(
       expect.stringContaining("exec action missing 'command'"),
     );
-  });
-
-  it("detects invalid templates in exec action command", () => {
-    const config = validConfig({
-      actions: [
-        {
-          id: "tmpl_exec",
-          type: "exec",
-          target: "result",
-          command: "echo {{broken}}",
-        } as never,
-      ],
-    });
-    const result = validateConfig(config);
-    expect(result.valid).toBe(false);
-    expect(result.errors).toContainEqual(
-      expect.stringContaining("invalid template"),
-    );
-    expect(result.errors).toContainEqual(expect.stringContaining("{{broken}}"));
   });
 
   it("detects invalid timeout in exec action", () => {

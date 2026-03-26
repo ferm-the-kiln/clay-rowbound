@@ -1395,22 +1395,28 @@ function saveSettings() {
 function showEditor(action, columnName) {
   state.view = 'editor';
   updateTabBar('editor');
-  var a = deepCopy(action);
-  // Detect AI actions stored as exec: if it has _ai_runtime tag, or the command
-  // looks like a claude/codex invocation, present it as type "ai" in the editor
-  if (a.type === 'exec' && (a._ai_runtime || (a.command && (a.command.indexOf('claude -p') >= 0 || a.command.indexOf('codex exec') >= 0)))) {
-    a.type = 'ai';
-  }
-  state.editingAction = a;
-  state.originalAction = deepCopy(action);
   if (columnName) state.columnInfo.column = columnName;
 
-  // Show header + skeleton while fetching fresh headers
+  // Show skeleton while fetching fresh config + headers
   renderHeader(resolveColumnName(action.target), { back: 'showOverview()' });
   safeSetHTML(document.getElementById('content'), '<div style="padding:4px 0"><div class="skeleton skeleton-card"></div><div class="skeleton skeleton-card"></div><div class="skeleton skeleton-card"></div></div>');
   safeSetHTML(document.getElementById('footer'), '');
-  fetchFreshHeaders(function() {
-    renderHeader(resolveColumnName(action.target), { back: 'showOverview()', columnSelect: true });
+
+  refreshAll(function() {
+    // Re-find the action from fresh config (it may have been updated externally)
+    var freshAction = null;
+    var actions = getActions();
+    for (var i = 0; i < actions.length; i++) {
+      if (actions[i].id === action.id) { freshAction = actions[i]; break; }
+    }
+    var a = deepCopy(freshAction || action);
+    if (a.type === 'exec' && (a._ai_runtime || (a.command && (a.command.indexOf('claude -p') >= 0 || a.command.indexOf('codex exec') >= 0)))) {
+      a.type = 'ai';
+    }
+    state.editingAction = a;
+    state.originalAction = deepCopy(freshAction || action);
+
+    renderHeader(resolveColumnName(a.target), { back: 'showOverview()', columnSelect: true });
     renderEditorContent();
     renderFooter([
       { label: 'Delete', cls: 'btn-danger', action: 'confirmDelete()' },
@@ -1461,11 +1467,11 @@ function showCreate(columnName) {
   state.editingAction = a;
   state.originalAction = null;
 
-  // Show header + skeleton while fetching fresh headers
+  // Show skeleton while fetching fresh config + headers
   renderHeader(col, { back: 'showOverview()' });
   safeSetHTML(document.getElementById('content'), '<div style="padding:4px 0"><div class="skeleton skeleton-card"></div><div class="skeleton skeleton-card"></div><div class="skeleton skeleton-card"></div></div>');
   safeSetHTML(document.getElementById('footer'), '');
-  fetchFreshHeaders(function() {
+  refreshAll(function() {
     renderHeader(col, { back: 'showOverview()', columnSelect: true });
     renderEditorContent();
     renderFooter([
@@ -2899,18 +2905,21 @@ var _refreshing = false;
  * Refresh everything — config, tabs, headers. Called by the refresh button
  * and automatically after save/delete operations.
  */
-function refreshAll() {
-  if (_refreshing) return;
+function refreshAll(callback) {
+  if (_refreshing && !callback) return;
   _refreshing = true;
 
-  // Visual feedback — spin the refresh icon
+  // Visual feedback
   var btn = document.getElementById('refresh-btn');
   if (btn) btn.style.opacity = '0.5';
 
   serverCall('getInitData', undefined, function(err, data) {
     _refreshing = false;
     if (btn) btn.style.opacity = '1';
-    if (err || !data) return;
+    if (err || !data) {
+      if (callback) callback();
+      return;
+    }
 
     state.config = data.config;
     state.tabs = data.tabs || [];
@@ -2924,8 +2933,9 @@ function refreshAll() {
     updateSheetTabSelector();
     try { sessionStorage.setItem('rb_initData', JSON.stringify(data)); } catch (e) {}
 
-    // Re-render current view if on a list view (not mid-edit)
-    if (!state.editingAction && !state.editingSource && !state.editingScript) {
+    if (callback) {
+      callback();
+    } else if (!state.editingAction && !state.editingSource && !state.editingScript) {
       refreshCurrentView();
     }
   });

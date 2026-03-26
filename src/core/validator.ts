@@ -52,30 +52,12 @@ const KNOWN_HTTP_METHODS = new Set([
 ]);
 
 /**
- * Regex for valid template placeholders: {{row.xxx}} or {{env.XXX}}.
- * Invalid patterns are anything inside {{ }} that does NOT match this form.
+ * Template validation: all {{...}} patterns are now valid since bare column
+ * refs (IDs or names) are resolved at runtime by expandColumnRefs / resolveTemplate.
+ * Accepts: {{row.x}}, {{env.X}}, {{item.x}}, {{columnName}}, {{columnId}}
  */
-const VALID_TEMPLATE_REGEX = /^\{\{(row|env)\.[^}]+\}\}$/;
-
-/** Extended regex that also allows {{item.xxx}} (for write action column templates). */
-const VALID_TEMPLATE_REGEX_EXTENDED = /^\{\{(row|env|item)\.[^}]+\}\}$/;
-
-/**
- * Finds all {{...}} patterns in a string and returns any that are invalid.
- * When `allowItem` is true, {{item.xxx}} is also accepted (used by write action column values).
- */
-function findInvalidTemplates(value: string, allowItem = false): string[] {
-  const TEMPLATE_REGEX = /\{\{[^}]*\}\}/g;
-  const validRegex = allowItem
-    ? VALID_TEMPLATE_REGEX_EXTENDED
-    : VALID_TEMPLATE_REGEX;
-  const invalid: string[] = [];
-  for (const match of value.matchAll(TEMPLATE_REGEX)) {
-    if (!validRegex.test(match[0])) {
-      invalid.push(match[0]);
-    }
-  }
-  return invalid;
+function findInvalidTemplates(_value: string, _allowItem = false): string[] {
+  return [];
 }
 
 /**
@@ -92,11 +74,14 @@ function collectStrings(obj: unknown): string[] {
 
 /**
  * Check whether a `when` expression can be parsed as valid JavaScript.
- * Uses vm.compileFunction which only compiles (no callable Function object).
+ * Expands {{...}} refs to dummy variables before parsing since the
+ * condition evaluator does this at runtime.
  */
 function isParseableExpression(expression: string): boolean {
   try {
-    vm.compileFunction(`"use strict"; return (${expression});`);
+    // Replace {{...}} with a safe placeholder variable for parsing
+    const expanded = expression.replace(/\{\{[^}]+\}\}/g, "'__placeholder__'");
+    vm.compileFunction(`"use strict"; return (${expanded});`);
     return true;
   } catch {
     return false;
