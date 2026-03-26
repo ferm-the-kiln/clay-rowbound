@@ -2826,7 +2826,8 @@ function init() {
 document.addEventListener('DOMContentLoaded', function() {
   init();
   // Single fast poll loop — checks tab + config version via PropertiesService (~10ms)
-  setInterval(pollStateChanges, 1500);
+  // 2s interval = ~43,200 calls/day, safely under Apps Script's 50,000/day quota
+  setInterval(pollStateChanges, 2000);
 });
 
 /** Show a skeleton loading state with the new tab name so the user
