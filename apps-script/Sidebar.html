@@ -1392,6 +1392,7 @@ function saveSettings() {
 function showEditor(action, columnName) {
   state.view = 'editor';
   updateTabBar('editor');
+  refreshHeadersIfNeeded();
   var a = deepCopy(action);
   // Detect AI actions stored as exec: if it has _ai_runtime tag, or the command
   // looks like a claude/codex invocation, present it as type "ai" in the editor
@@ -2579,6 +2580,20 @@ function getColumnIdMap() {
   return tc ? tc.columns : {};
 }
 
+/** Get all available column names — tracked columns + any untracked sheet headers */
+function getAllColumnNames() {
+  var names = {};
+  // Tracked columns from config (have stable IDs)
+  var colMap = getColumnIdMap();
+  for (var id in colMap) names[colMap[id]] = id;
+  // Also include sheet headers that may not be tracked yet
+  var headers = (state.columnInfo && state.columnInfo.headers) || [];
+  for (var i = 0; i < headers.length; i++) {
+    if (!names[headers[i]]) names[headers[i]] = '';
+  }
+  return names;
+}
+
 /** Build a columnName → columnId reverse map */
 function getColumnNameToIdMap() {
   var map = getColumnIdMap();
@@ -2617,6 +2632,20 @@ var _colPickerItems = [];
 var _colPickerIdx = -1;
 var _colPickerTarget = null;
 var _colPickerTriggerPos = -1;
+var _headersRefreshing = false;
+
+/** Refresh headers from sheet in background so new columns appear */
+function refreshHeadersIfNeeded() {
+  if (_headersRefreshing || !state.columnInfo) return;
+  _headersRefreshing = true;
+  var tabName = state.columnInfo.tabName;
+  serverCall('getTabHeaders', tabName, function(err, headers) {
+    _headersRefreshing = false;
+    if (!err && headers) {
+      state.columnInfo.headers = headers;
+    }
+  });
+}
 
 /** Global listener: detect / in any input or textarea to show column picker */
 document.addEventListener('input', function(e) {
@@ -2632,6 +2661,8 @@ document.addEventListener('input', function(e) {
   if (match && (match.index === 0 || before[match.index - 1] !== '/')) {
     _colPickerTarget = el;
     _colPickerTriggerPos = match.index;
+    // Refresh headers in background to catch new columns
+    refreshHeadersIfNeeded();
     showColPicker(el, match[1]);
   } else {
     hideColPicker();
@@ -2672,12 +2703,12 @@ function showColPicker(el, filter) {
     document.body.appendChild(dropdown);
   }
 
-  var colMap = getColumnIdMap();
+  // Use all available columns (tracked + untracked sheet headers)
+  var allCols = getAllColumnNames();
   var entries = [];
-  for (var id in colMap) {
-    var name = colMap[id];
+  for (var name in allCols) {
     if (!filter || name.toLowerCase().indexOf(filter.toLowerCase()) >= 0) {
-      entries.push({ id: id, name: name });
+      entries.push({ id: allCols[name], name: name });
     }
   }
   entries.sort(function(a, b) { return a.name.localeCompare(b.name); });
