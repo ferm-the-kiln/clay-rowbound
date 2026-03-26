@@ -423,10 +423,13 @@ body {
       <option value="">Loading...</option>
     </select>
   </div>
-  <div id="tab-bar" style="display:none">
-    <button class="tab-btn active" onclick="switchTab('overview')" data-tab="overview">Actions</button>
-    <button class="tab-btn" onclick="switchTab('sources')" data-tab="sources">Sources</button>
-    <button class="tab-btn" onclick="switchTab('settings')" data-tab="settings">Settings</button>
+  <div id="tab-bar" style="display:none;padding:0 16px 8px">
+    <div style="font-size:15px;color:#202124;font-weight:600;margin-bottom:6px">View</div>
+    <select id="view-select" class="field-select" style="width:100%;font-weight:500" onchange="switchTab(this.value)">
+      <option value="overview">Actions</option>
+      <option value="sources">Sources</option>
+      <option value="settings">Settings</option>
+    </select>
   </div>
   <div id="content">
     <div style="padding: 16px;">
@@ -743,13 +746,6 @@ function serverCall(fn, arg, cb) {
    TAB BAR
    ═══════════════════════════════════════════════════════════════════════════ */
 function switchTab(tab) {
-  // Update active tab styling
-  var btns = document.querySelectorAll('.tab-btn');
-  for (var i = 0; i < btns.length; i++) {
-    btns[i].className = btns[i].getAttribute('data-tab') === tab
-      ? 'tab-btn active' : 'tab-btn';
-  }
-  // Navigate to the tab's view
   if (tab === 'overview') showOverview();
   else if (tab === 'sources') showSources();
   else if (tab === 'settings') showSettings();
@@ -759,17 +755,11 @@ function updateTabBar(activeTab) {
   var bar = document.getElementById('tab-bar');
   var sheetSel = document.getElementById('sheet-tab-selector');
   if (!bar) return;
-  // Show tab bar and sheet selector on list views and settings, hide on editors
   var showTabs = (activeTab === 'overview' || activeTab === 'sources' || activeTab === 'settings');
-  bar.style.display = showTabs ? 'flex' : 'none';
+  bar.style.display = showTabs ? '' : 'none';
   if (sheetSel) sheetSel.style.display = showTabs ? '' : 'none';
-  if (showTabs) {
-    var btns = bar.querySelectorAll('.tab-btn');
-    for (var i = 0; i < btns.length; i++) {
-      btns[i].className = btns[i].getAttribute('data-tab') === activeTab
-        ? 'tab-btn active' : 'tab-btn';
-    }
-  }
+  var viewSelect = document.getElementById('view-select');
+  if (viewSelect && showTabs) viewSelect.value = activeTab;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
