@@ -672,9 +672,9 @@ function displayType(a) {
 
 function actionSummary(a) {
   switch (a.type) {
-    case 'http': return (a.method || 'GET') + ' ' + (a.url || '');
+    case 'http': return (a.method || 'GET') + ' ' + resolveIds(a.url || '');
     case 'waterfall': return (a.providers ? a.providers.length : 0) + ' providers';
-    case 'formula': return a.expression || '';
+    case 'formula': return resolveIds(a.expression || '');
     case 'exec': return a.command || '';
     case 'lookup': return (a.sourceTab || '?') + ' \u2192 ' + (a.returnType || 'value');
     case 'write': return (a.mode || 'append') + ' \u2192 ' + (a.destTab || '?');
@@ -880,7 +880,7 @@ function showOverview() {
       if (i < actions.length - 1) h += '<button onclick="event.stopPropagation();moveAction(' + i + ',1)" title="Move down">&#9660;</button>';
       h += '</div></div>';
       h += '<div class="action-item-meta">' + esc(actionSummary(a)) + '</div>';
-      if (a.when) h += '<div class="action-item-meta">if: ' + esc(humanizeExpression(a.when)) + '</div>';
+      if (a.when) h += '<div class="action-item-meta">if: ' + esc(resolveIds(a.when)) + '</div>';
       h += '</div>';
     }
   }
@@ -1413,7 +1413,7 @@ function showEditor(action, columnName) {
     if (a.type === 'exec' && (a._ai_runtime || (a.command && (a.command.indexOf('claude -p') >= 0 || a.command.indexOf('codex exec') >= 0)))) {
       a.type = 'ai';
     }
-    state.editingAction = a;
+    state.editingAction = resolveActionForDisplay(a);
     state.originalAction = deepCopy(freshAction || action);
 
     renderHeader(resolveColumnName(a.target), { back: 'showOverview()', columnSelect: true });
@@ -2320,7 +2320,7 @@ function moveAction(idx, dir) {
 }
 
 function saveAction() {
-  var newAction = readFormAction();
+  var newAction = storeActionIds(readFormAction());
   ensureConfig();
   var actions = getActions();
 
@@ -2624,26 +2624,85 @@ function getColumnNameToIdMap() {
   return rev;
 }
 
-/** Resolve {{colId}} refs in an expression to {{Column Name}} for display */
-function resolveExpressionIds(expr) {
+/** Resolve {{colId}} refs in a string to {{Column Name}} for display */
+function resolveIds(expr) {
   if (!expr) return '';
   var colMap = getColumnIdMap();
   return expr.replace(/\{\{([^}]+)\}\}/g, function(match, ref) {
     var trimmed = ref.trim();
+    // Skip env/item refs
+    if (trimmed.indexOf('env.') === 0 || trimmed.indexOf('item.') === 0) return match;
     var name = colMap[trimmed];
     return name ? '{{' + name + '}}' : match;
   });
 }
 
-/** Convert {{Column Name}} to {{colId}} for storage */
-function storeExpressionIds(expr) {
+// Keep old name as alias
+var resolveExpressionIds = resolveIds;
+
+/** Resolve all {{colId}} refs in an entire action object for display */
+function resolveActionForDisplay(a) {
+  var copy = deepCopy(a);
+  var stringFields = ['prompt', 'expression', 'when', 'url', 'command', 'extract', 'matchValue', 'matchColumn', 'expand', '_ai_prompt'];
+  for (var i = 0; i < stringFields.length; i++) {
+    var k = stringFields[i];
+    if (copy[k] && typeof copy[k] === 'string') copy[k] = resolveIds(copy[k]);
+  }
+  // Resolve body if it has templates
+  if (copy.body) {
+    var bodyStr = JSON.stringify(copy.body);
+    var resolved = resolveIds(bodyStr);
+    if (resolved !== bodyStr) {
+      try { copy.body = JSON.parse(resolved); } catch(e) {}
+    }
+  }
+  // Resolve write action columns
+  if (copy.columns && typeof copy.columns === 'object') {
+    var newCols = {};
+    for (var ck in copy.columns) {
+      newCols[ck] = resolveIds(copy.columns[ck]);
+    }
+    copy.columns = newCols;
+  }
+  return copy;
+}
+
+/** Convert {{Column Name}} to {{colId}} in a string for storage */
+function storeIds(expr) {
   if (!expr) return '';
   var rev = getColumnNameToIdMap();
   return expr.replace(/\{\{([^}]+)\}\}/g, function(match, ref) {
     var trimmed = ref.trim();
+    if (trimmed.indexOf('env.') === 0 || trimmed.indexOf('item.') === 0) return match;
     var id = rev[trimmed];
     return id ? '{{' + id + '}}' : match;
   });
+}
+
+var storeExpressionIds = storeIds;
+
+/** Convert all {{Column Name}} refs in a saved action to {{colId}} */
+function storeActionIds(a) {
+  var stringFields = ['prompt', 'expression', 'when', 'url', 'command', 'extract', 'matchValue', 'matchColumn', 'expand', '_ai_prompt'];
+  for (var i = 0; i < stringFields.length; i++) {
+    var k = stringFields[i];
+    if (a[k] && typeof a[k] === 'string') a[k] = storeIds(a[k]);
+  }
+  if (a.body) {
+    var bodyStr = JSON.stringify(a.body);
+    var stored = storeIds(bodyStr);
+    if (stored !== bodyStr) {
+      try { a.body = JSON.parse(stored); } catch(e) {}
+    }
+  }
+  if (a.columns && typeof a.columns === 'object') {
+    var newCols = {};
+    for (var ck in a.columns) {
+      newCols[ck] = storeIds(a.columns[ck]);
+    }
+    a.columns = newCols;
+  }
+  return a;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
