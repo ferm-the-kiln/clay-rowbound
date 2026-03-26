@@ -874,8 +874,6 @@ function showOverview() {
       h += '<span class="badge badge-' + esc(dt) + '">' + esc(dt === 'ai' ? 'AI' : dt) + '</span>';
       h += '<span class="action-item-title">' + esc(resolveColumnName(a.target)) + '</span>';
       h += '</div>';
-      h += '<div class="action-item-meta">' + esc(actionSummary(a)) + '</div>';
-      if (a.when) h += '<div class="action-item-meta">if: ' + esc(resolveIds(a.when)) + '</div>';
       h += '</div>';
     }
   }
@@ -914,8 +912,6 @@ function showSources() {
       h += '<span class="badge badge-src-' + esc(sdt) + '">' + esc(sdt === 'ai' ? 'AI' : sdt) + '</span>';
       h += '<span class="action-item-title">' + esc(s.id) + '</span>';
       h += '</div>';
-      h += '<div class="action-item-meta">' + esc(sourceSummary(s)) + '</div>';
-      h += '<div class="action-item-meta">' + esc(schedule) + (s.dedup ? ' \u00b7 dedup: ' + esc(s.dedup) : '') + '</div>';
       h += '</div>';
     }
   }
