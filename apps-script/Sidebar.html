@@ -42,9 +42,6 @@ body {
 }
 #header-nav {
   margin-top: 8px;
-  display: flex;
-  gap: 8px;
-  align-items: center;
 }
 .header-nav-label {
   font-size: 12px;
@@ -757,10 +754,12 @@ function switchTab(tab) {
 
 function updateTabBar(activeTab) {
   var bar = document.getElementById('tab-bar');
+  var sheetSel = document.getElementById('sheet-tab-selector');
   if (!bar) return;
-  // Show tab bar on list views and settings, hide on editors
+  // Show tab bar and sheet selector on list views and settings, hide on editors
   var showTabs = (activeTab === 'overview' || activeTab === 'sources' || activeTab === 'settings');
   bar.style.display = showTabs ? 'flex' : 'none';
+  if (sheetSel) sheetSel.style.display = showTabs ? '' : 'none';
   if (showTabs) {
     var btns = bar.querySelectorAll('.tab-btn');
     for (var i = 0; i < btns.length; i++) {
@@ -1429,7 +1428,7 @@ function renderEditorContent() {
   // Environment variables — per-action overrides
   h += '<div class="section"><div class="section-title">Environment Variables</div>';
   h += '<p class="field-hint" style="margin-bottom:8px">Per-action env var overrides. Merged into execution environment for this action only.</p>';
-  h += buildKvList('actionEnv', a.env || {}, 'Variable', 'Value');
+  h += buildKvList('actionEnv', a.env || {}, 'e.g. API_KEY', 'e.g. sk-abc123');
   h += '</div>';
 
   // Run conditions — at the bottom
@@ -1590,7 +1589,7 @@ function buildProviderCard(p, idx) {
   h += '<div style="margin-top:8px">';
   h += buildKvList('p_headers_' + idx, p.headers || {}, 'Header', 'Value');
   h += '<div style="margin-top:8px">';
-  h += buildKvList('p_onError_' + idx, flattenOnError(p.onError), 'Code', 'Action');
+  h += buildKvList('p_onError_' + idx, flattenOnError(p.onError), 'e.g. 404', 'e.g. skip');
   h += '</div></div></details>';
   h += '</div></div>';
   return h;
