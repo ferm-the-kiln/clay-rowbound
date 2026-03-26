@@ -1457,27 +1457,52 @@ function renderEditorContent() {
    VIEW: CREATE
    ═══════════════════════════════════════════════════════════════════════════ */
 function showCreate(columnName) {
+  if (columnName) {
+    // Column already selected — go straight to editor
+    showCreateWithColumn(columnName);
+    return;
+  }
+  // Show column picker first
   state.view = 'create';
   updateTabBar('create');
-  var col = columnName || (state.columnInfo ? state.columnInfo.column : 'new_column');
+  renderHeader('New Action', { back: 'showOverview()' });
+
+  // Fetch fresh headers then show picker
+  safeSetHTML(document.getElementById('content'), '<div style="padding:4px 0"><div class="skeleton skeleton-card"></div></div>');
+  safeSetHTML(document.getElementById('footer'), '');
+  fetchFreshHeaders(function() {
+    var headers = (state.columnInfo && state.columnInfo.headers) || [];
+    var h = '<div class="section"><div class="section-title">Select Column</div>';
+    h += '<span class="field-label">Column</span>';
+    h += '<select class="field-select" style="width:100%" id="create-col-select">';
+    for (var i = 0; i < headers.length; i++) {
+      h += '<option value="' + esc(headers[i]) + '">' + esc(headers[i]) + '</option>';
+    }
+    h += '</select></div>';
+    safeSetHTML(document.getElementById('content'), h);
+    renderFooter([
+      { label: 'Cancel', cls: 'btn-secondary', action: 'showOverview()' },
+      'spacer',
+      { label: 'Next', cls: 'btn-primary', action: 'showCreateWithColumn(document.getElementById("create-col-select").value)' }
+    ]);
+  });
+}
+
+function showCreateWithColumn(col) {
+  state.view = 'create';
+  updateTabBar('create');
   if (state.columnInfo) state.columnInfo.column = col;
   var a = { id: generateId(), type: 'http', target: col, method: 'GET', url: '', extract: '' };
   state.editingAction = a;
   state.originalAction = null;
 
-  // Show skeleton while fetching fresh config + headers
-  renderHeader(col, { back: 'showOverview()' });
-  safeSetHTML(document.getElementById('content'), '<div style="padding:4px 0"><div class="skeleton skeleton-card"></div><div class="skeleton skeleton-card"></div><div class="skeleton skeleton-card"></div></div>');
-  safeSetHTML(document.getElementById('footer'), '');
-  refreshAll(function() {
-    renderHeader(col, { back: 'showOverview()', columnSelect: true });
-    renderEditorContent();
-    renderFooter([
-      { label: 'Cancel', cls: 'btn-secondary', action: 'cancelEdit()' },
-      'spacer',
-      { label: 'Create', cls: 'btn-primary', action: 'saveAction()' }
-    ]);
-  });
+  renderHeader(col, { back: 'showOverview()', columnSelect: true });
+  renderEditorContent();
+  renderFooter([
+    { label: 'Cancel', cls: 'btn-secondary', action: 'cancelEdit()' },
+    'spacer',
+    { label: 'Create', cls: 'btn-primary', action: 'saveAction()' }
+  ]);
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
