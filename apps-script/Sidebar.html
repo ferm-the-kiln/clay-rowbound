@@ -414,14 +414,14 @@ body {
 
 <div id="app">
   <div id="header"></div>
-  <div id="sheet-tab-selector" style="padding:6px 16px 8px;display:none">
-    <div style="display:flex;align-items:center;margin-bottom:6px">
-      <span style="font-size:14px;font-weight:600;flex:1">Sheet</span>
-      <button class="btn-icon" onclick="refreshAll()" title="Refresh" id="refresh-btn" style="font-size:15px;padding:2px 6px;cursor:pointer">&#8635;</button>
+  <div id="sheet-tab-selector" style="padding:10px 16px 8px;display:none">
+    <div style="display:flex;align-items:center;gap:8px">
+      <select id="sheet-tab-select" style="font-size:18px;font-weight:600;border:none;background:none;padding:0;cursor:pointer;flex:1;outline:none;-webkit-appearance:none;appearance:none" onchange="onSheetTabSelect(this.value)">
+        <option value="">Loading...</option>
+      </select>
+      <span style="font-size:10px;color:#999;pointer-events:none;margin-left:-24px">&#9662;</span>
+      <button class="btn-icon" onclick="refreshAll()" title="Refresh" id="refresh-btn" style="font-size:15px;padding:2px 6px;cursor:pointer;color:#999">&#8635;</button>
     </div>
-    <select id="sheet-tab-select" class="field-select" style="width:100%;font-weight:500" onchange="onSheetTabSelect(this.value)">
-      <option value="">Loading...</option>
-    </select>
   </div>
   <div id="tab-bar" style="display:none">
     <button class="tab-btn active" onclick="switchTab('overview')" data-tab="overview">Actions</button>
@@ -860,8 +860,7 @@ function showOverview() {
 
   // Enabled/disabled toggle
   h += '<div class="toggle-row">';
-  h += '<div><div class="toggle-label">' + esc(state.columnInfo ? state.columnInfo.tabName : 'Tab') + '</div>';
-  h += '<div class="toggle-sub">' + (enabled ? 'Pipeline active' : 'Pipeline stopped') + '</div></div>';
+  h += '<div><div class="toggle-sub">' + (enabled ? 'Pipeline active' : 'Pipeline stopped') + '</div></div>';
   h += '<div class="toggle ' + (enabled ? 'on' : '') + '" onclick="toggleTabEnabled()"><div class="toggle-knob"></div></div>';
   h += '</div>';
 
