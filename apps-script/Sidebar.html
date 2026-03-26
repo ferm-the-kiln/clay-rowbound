@@ -954,7 +954,7 @@ function showCreateSource() {
   var s = { id: 'new_source', type: 'http', method: 'POST', url: '', extract: '$', columns: {}, schedule: 'manual' };
   state.editingSource = s;
   state.originalSource = null;
-  renderHeader('New Source', { back: 'showSources()' });
+  renderHeader('Source', { back: 'showSources()' });
   renderSourceEditorContent();
   renderFooter([
     { label: 'Cancel', cls: 'btn-secondary', action: 'showSources()' },
@@ -1453,7 +1453,7 @@ function showCreate(columnName) {
   state.editingAction = a;
   state.originalAction = null;
 
-  renderHeader('New Action: ' + col, { back: 'showOverview()', columnSelect: true });
+  renderHeader(col, { back: 'showOverview()', columnSelect: true });
   renderEditorContent();
   renderFooter([
     { label: 'Cancel', cls: 'btn-secondary', action: 'cancelEdit()' },
@@ -2452,7 +2452,7 @@ function showCreateScript() {
   var sc = { runtime: 'bash', code: '' };
   state.editingScript = sc;
   state.originalScript = null;
-  renderHeader('New Script', { back: 'showSettings()' });
+  renderHeader('Script', { back: 'showSettings()' });
   renderScriptEditorContent('');
   renderFooter([
     { label: 'Cancel', cls: 'btn-secondary', action: 'showSettings()' },
