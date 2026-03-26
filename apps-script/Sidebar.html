@@ -1438,7 +1438,6 @@ function renderEditorContent() {
   h += '</div>';
 
   safeSetHTML(document.getElementById('content'), h);
-  setTimeout(initPillEditors, 0);
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -1596,16 +1595,14 @@ function buildProviderCard(p, idx) {
 }
 
 function buildFormulaFields(a) {
+  // Resolve column IDs to names for display
+  var expr = resolveExpressionIds(a.expression || '');
   var h = '<div class="section"><div class="section-title">Formula</div>';
-  h += '<div class="field"><span class="field-label">Expression</span>';
-  h += '<div style="position:relative">';
-  h += '<div class="pill-editor" contenteditable="true" data-name="expression" data-placeholder="Type {{ to insert a column reference">';
-  h += expressionToHtml(a.expression || '');
+  h += field('Expression',
+    '<textarea class="field-textarea" name="expression" rows="3" placeholder="Type / to insert a column">' +
+    esc(expr) + '</textarea>',
+    'JavaScript expression. Type / to insert a column reference.');
   h += '</div>';
-  h += '<div id="pill-dropdown" class="pill-dropdown" style="display:none"></div>';
-  h += '</div>';
-  h += '<div class="field-hint">JavaScript expression. Type {{ to insert a column reference.</div>';
-  h += '</div></div>';
   return h;
 }
 
@@ -2107,7 +2104,7 @@ function readFormAction() {
       break;
 
     case 'formula':
-      a.expression = getPillEditorValue('expression') || getVal('expression');
+      a.expression = storeExpressionIds(getVal('expression'));
       break;
 
     case 'exec':
@@ -2590,115 +2587,91 @@ function getColumnNameToIdMap() {
   return rev;
 }
 
-/** Convert a stored expression (with {{colId}} refs) to HTML with pills */
-function expressionToHtml(expr) {
+/** Resolve {{colId}} refs in an expression to {{Column Name}} for display */
+function resolveExpressionIds(expr) {
   if (!expr) return '';
   var colMap = getColumnIdMap();
-  // Split on {{...}} tokens, build safe HTML
-  var parts = expr.split(/(\{\{[^}]+\}\})/g);
-  var html = '';
-  for (var i = 0; i < parts.length; i++) {
-    var part = parts[i];
-    var m = part.match(/^\{\{([^}]+)\}\}$/);
-    if (m) {
-      var ref = m[1].trim();
-      var name = colMap[ref] || ref;
-      var id = colMap[ref] ? ref : '';
-      if (!id) {
-        var rev = getColumnNameToIdMap();
-        id = rev[ref] || '';
-      }
-      html += '<span class="pill" contenteditable="false" data-col-id="' + esc(id || ref) + '">' + esc(name) + '</span>';
-    } else {
-      html += esc(part);
-    }
-  }
-  return html;
+  return expr.replace(/\{\{([^}]+)\}\}/g, function(match, ref) {
+    var trimmed = ref.trim();
+    var name = colMap[trimmed];
+    return name ? '{{' + name + '}}' : match;
+  });
 }
 
-/** Serialize pill editor DOM back to expression string with {{colId}} refs */
-function htmlToExpression(editorEl) {
-  var result = '';
-  var nodes = editorEl.childNodes;
-  for (var i = 0; i < nodes.length; i++) {
-    var node = nodes[i];
-    if (node.nodeType === 3) {
-      result += node.textContent;
-    } else if (node.nodeType === 1 && node.classList && node.classList.contains('pill')) {
-      var colId = node.getAttribute('data-col-id');
-      result += '{{' + (colId || node.textContent) + '}}';
-    } else if (node.nodeType === 1) {
-      if (node.tagName === 'BR') result += '\n';
-      else result += node.textContent || '';
-    }
-  }
-  return result.trim();
+/** Convert {{Column Name}} to {{colId}} for storage */
+function storeExpressionIds(expr) {
+  if (!expr) return '';
+  var rev = getColumnNameToIdMap();
+  return expr.replace(/\{\{([^}]+)\}\}/g, function(match, ref) {
+    var trimmed = ref.trim();
+    var id = rev[trimmed];
+    return id ? '{{' + id + '}}' : match;
+  });
 }
 
-/** Read value from a pill editor by name */
-function getPillEditorValue(name) {
-  var el = document.querySelector('.pill-editor[data-name="' + name + '"]');
-  return el ? htmlToExpression(el) : '';
-}
+/* ═══════════════════════════════════════════════════════════════════════════
+   GLOBAL / COLUMN PICKER — type / in any input/textarea to insert {{Column}}
+   ═══════════════════════════════════════════════════════════════════════════ */
 
-/** Set up pill editor event listeners after DOM insert */
-function initPillEditors() {
-  var editors = document.querySelectorAll('.pill-editor');
-  for (var i = 0; i < editors.length; i++) {
-    var editor = editors[i];
-    if (editor._pillInit) continue;
-    editor._pillInit = true;
-    editor.addEventListener('input', handlePillEditorInput);
-    editor.addEventListener('keydown', handlePillEditorKeydown);
-  }
-}
+var _colPickerItems = [];
+var _colPickerIdx = -1;
+var _colPickerTarget = null;
+var _colPickerTriggerPos = -1;
 
-var _pillDropdownItems = [];
-var _pillDropdownIdx = -1;
-var _pillDropdownEditor = null;
+/** Global listener: detect / in any input or textarea to show column picker */
+document.addEventListener('input', function(e) {
+  var el = e.target;
+  if (el.tagName !== 'INPUT' && el.tagName !== 'TEXTAREA') return;
 
-function handlePillEditorInput(e) {
-  var editor = e.target.closest('.pill-editor');
-  if (!editor) return;
-  var sel = window.getSelection();
-  if (!sel.rangeCount) return;
-  var range = sel.getRangeAt(0);
-  if (range.startContainer.nodeType !== 3) return;
-  var text = range.startContainer.textContent;
-  var pos = range.startOffset;
-  var before = text.substring(0, pos);
-  var match = before.match(/\{\{([^}]*)$/);
-  if (match) {
-    showPillDropdown(editor, match[1]);
+  var val = el.value;
+  var pos = el.selectionStart;
+  var before = val.substring(0, pos);
+
+  // Check if user just typed / or is mid-filter after /
+  var match = before.match(/\/([^/\n]*)$/);
+  if (match && (match.index === 0 || before[match.index - 1] !== '/')) {
+    _colPickerTarget = el;
+    _colPickerTriggerPos = match.index;
+    showColPicker(el, match[1]);
   } else {
-    hidePillDropdown();
+    hideColPicker();
   }
-}
+});
 
-function handlePillEditorKeydown(e) {
-  var dropdown = document.getElementById('pill-dropdown');
+document.addEventListener('keydown', function(e) {
+  var dropdown = document.getElementById('col-picker');
   if (!dropdown || dropdown.style.display === 'none') return;
+
   if (e.key === 'ArrowDown') {
     e.preventDefault();
-    _pillDropdownIdx = Math.min(_pillDropdownIdx + 1, _pillDropdownItems.length - 1);
-    highlightDropdownItem();
+    _colPickerIdx = Math.min(_colPickerIdx + 1, _colPickerItems.length - 1);
+    highlightColPickerItem();
   } else if (e.key === 'ArrowUp') {
     e.preventDefault();
-    _pillDropdownIdx = Math.max(_pillDropdownIdx - 1, 0);
-    highlightDropdownItem();
-  } else if (e.key === 'Enter' && _pillDropdownIdx >= 0) {
+    _colPickerIdx = Math.max(_colPickerIdx - 1, 0);
+    highlightColPickerItem();
+  } else if (e.key === 'Enter' && _colPickerIdx >= 0) {
     e.preventDefault();
-    selectDropdownItem(_pillDropdownIdx);
+    selectColPickerItem(_colPickerIdx);
   } else if (e.key === 'Escape') {
     e.preventDefault();
-    hidePillDropdown();
+    hideColPicker();
+  } else if (e.key === 'Tab' && _colPickerIdx >= 0) {
+    e.preventDefault();
+    selectColPickerItem(_colPickerIdx);
   }
-}
+});
 
-function showPillDropdown(editor, filter) {
-  var dropdown = document.getElementById('pill-dropdown');
-  if (!dropdown) return;
-  _pillDropdownEditor = editor;
+function showColPicker(el, filter) {
+  var dropdown = document.getElementById('col-picker');
+  if (!dropdown) {
+    dropdown = document.createElement('div');
+    dropdown.id = 'col-picker';
+    dropdown.className = 'pill-dropdown';
+    dropdown.style.display = 'none';
+    document.body.appendChild(dropdown);
+  }
+
   var colMap = getColumnIdMap();
   var entries = [];
   for (var id in colMap) {
@@ -2708,73 +2681,75 @@ function showPillDropdown(editor, filter) {
     }
   }
   entries.sort(function(a, b) { return a.name.localeCompare(b.name); });
-  _pillDropdownItems = entries;
-  _pillDropdownIdx = entries.length > 0 ? 0 : -1;
+  _colPickerItems = entries;
+  _colPickerIdx = entries.length > 0 ? 0 : -1;
 
   var h = '';
   if (entries.length === 0) {
     h = '<div class="pill-dropdown-empty">No columns found</div>';
   } else {
     for (var i = 0; i < entries.length; i++) {
-      h += '<div class="pill-dropdown-item' + (i === 0 ? ' active' : '') + '" data-idx="' + i + '" onmousedown="selectDropdownItem(' + i + ')">' + esc(entries[i].name) + '</div>';
+      h += '<div class="pill-dropdown-item' + (i === 0 ? ' active' : '') + '" data-idx="' + i + '" onmousedown="selectColPickerItem(' + i + ')">' + esc(entries[i].name) + '</div>';
     }
   }
   safeSetHTML(dropdown, h);
+
+  // Position dropdown below the input
+  var rect = el.getBoundingClientRect();
+  dropdown.style.position = 'fixed';
+  dropdown.style.left = rect.left + 'px';
+  dropdown.style.top = (rect.bottom + 2) + 'px';
+  dropdown.style.width = rect.width + 'px';
   dropdown.style.display = 'block';
 }
 
-function highlightDropdownItem() {
-  var items = document.querySelectorAll('.pill-dropdown-item');
+function highlightColPickerItem() {
+  var items = document.querySelectorAll('#col-picker .pill-dropdown-item');
   for (var i = 0; i < items.length; i++) {
-    items[i].className = 'pill-dropdown-item' + (i === _pillDropdownIdx ? ' active' : '');
+    items[i].className = 'pill-dropdown-item' + (i === _colPickerIdx ? ' active' : '');
   }
-  if (items[_pillDropdownIdx]) items[_pillDropdownIdx].scrollIntoView({ block: 'nearest' });
+  if (items[_colPickerIdx]) items[_colPickerIdx].scrollIntoView({ block: 'nearest' });
 }
 
-function selectDropdownItem(idx) {
-  var entry = _pillDropdownItems[idx];
-  if (!entry || !_pillDropdownEditor) return;
-  hidePillDropdown();
+function selectColPickerItem(idx) {
+  var entry = _colPickerItems[idx];
+  if (!entry || !_colPickerTarget) return;
 
-  var sel = window.getSelection();
-  if (!sel.rangeCount) return;
-  var range = sel.getRangeAt(0);
-  var textNode = range.startContainer;
-  if (textNode.nodeType !== 3) return;
-  var text = textNode.textContent;
-  var pos = range.startOffset;
-  var before = text.substring(0, pos);
-  var triggerIdx = before.lastIndexOf('{{');
-  if (triggerIdx === -1) return;
+  var el = _colPickerTarget;
+  var val = el.value;
+  var cursorPos = el.selectionStart;
 
-  var beforeText = text.substring(0, triggerIdx);
-  var afterText = text.substring(pos);
+  // Replace /filter with {{Column Name}}
+  var before = val.substring(0, _colPickerTriggerPos);
+  var after = val.substring(cursorPos);
+  var insert = '{{' + entry.name + '}}';
 
-  var pill = document.createElement('span');
-  pill.className = 'pill';
-  pill.contentEditable = 'false';
-  pill.setAttribute('data-col-id', entry.id);
-  pill.textContent = entry.name;
+  el.value = before + insert + after;
+  var newPos = before.length + insert.length;
+  el.setSelectionRange(newPos, newPos);
+  el.focus();
 
-  textNode.textContent = beforeText;
-  var parent = textNode.parentNode;
-  var afterNode = document.createTextNode(afterText || '\u200B');
-  parent.insertBefore(pill, textNode.nextSibling);
-  parent.insertBefore(afterNode, pill.nextSibling);
+  // Trigger input event so any listeners pick up the change
+  el.dispatchEvent(new Event('input', { bubbles: true }));
 
-  var newRange = document.createRange();
-  newRange.setStart(afterNode, afterText ? 0 : 1);
-  newRange.collapse(true);
-  sel.removeAllRanges();
-  sel.addRange(newRange);
+  hideColPicker();
 }
 
-function hidePillDropdown() {
-  var dropdown = document.getElementById('pill-dropdown');
+function hideColPicker() {
+  var dropdown = document.getElementById('col-picker');
   if (dropdown) dropdown.style.display = 'none';
-  _pillDropdownItems = [];
-  _pillDropdownIdx = -1;
+  _colPickerItems = [];
+  _colPickerIdx = -1;
+  _colPickerTarget = null;
 }
+
+// Hide picker when clicking outside
+document.addEventListener('mousedown', function(e) {
+  var dropdown = document.getElementById('col-picker');
+  if (dropdown && dropdown.style.display !== 'none' && !dropdown.contains(e.target)) {
+    hideColPicker();
+  }
+});
 
 /** Populate the sheet tab selector dropdown */
 function updateSheetTabSelector() {
