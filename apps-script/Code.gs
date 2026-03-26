@@ -13,7 +13,7 @@
 function onOpen() {
   SpreadsheetApp.getUi()
     .createMenu('Rowbound')
-    .addItem('Open Rowbound', 'openOverview')
+    .addItem('Open sidebar', 'openOverview')
     .addToUi();
 }
 
