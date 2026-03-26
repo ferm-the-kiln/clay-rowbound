@@ -1402,8 +1402,10 @@ function showEditor(action, columnName) {
   state.originalAction = deepCopy(action);
   if (columnName) state.columnInfo.column = columnName;
 
-  // Always fetch fresh headers then render — ensures new columns show up
+  // Show header + skeleton while fetching fresh headers
   renderHeader(resolveColumnName(action.target), { back: 'showOverview()' });
+  safeSetHTML(document.getElementById('content'), '<div style="padding:4px 0"><div class="skeleton skeleton-card"></div><div class="skeleton skeleton-card"></div><div class="skeleton skeleton-card"></div></div>');
+  safeSetHTML(document.getElementById('footer'), '');
   fetchFreshHeaders(function() {
     renderHeader(resolveColumnName(action.target), { back: 'showOverview()', columnSelect: true });
     renderEditorContent();
@@ -1456,8 +1458,10 @@ function showCreate(columnName) {
   state.editingAction = a;
   state.originalAction = null;
 
-  // Always fetch fresh headers then render
+  // Show header + skeleton while fetching fresh headers
   renderHeader(col, { back: 'showOverview()' });
+  safeSetHTML(document.getElementById('content'), '<div style="padding:4px 0"><div class="skeleton skeleton-card"></div><div class="skeleton skeleton-card"></div><div class="skeleton skeleton-card"></div></div>');
+  safeSetHTML(document.getElementById('footer'), '');
   fetchFreshHeaders(function() {
     renderHeader(col, { back: 'showOverview()', columnSelect: true });
     renderEditorContent();
