@@ -115,6 +115,8 @@ body {
 .field-input, .field-select {
   width: 100%;
   max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
   padding: 8px 10px;
   border: 1px solid #dadce0;
   border-radius: 4px;
@@ -417,7 +419,8 @@ body {
   <div id="header">
     <div id="header-title"><span>Rowbound</span></div>
   </div>
-  <div id="sheet-tab-selector" style="padding:6px 16px;border-bottom:1px solid #eee">
+  <div id="sheet-tab-selector" style="padding:8px 16px 6px;border-bottom:1px solid #eee">
+    <div style="font-size:11px;color:#80868b;margin-bottom:4px;font-weight:500">Sheet</div>
     <select id="sheet-tab-select" class="field-select" style="width:100%;font-weight:500" onchange="onSheetTabSelect(this.value)">
       <option value="">Loading...</option>
     </select>
@@ -708,7 +711,7 @@ function ensureConfig() {
       tabs: {},
       actions: [],
       scripts: {},
-      settings: { concurrency: 1, rateLimit: 5, retryAttempts: 2, retryBackoff: 'exponential' }
+      settings: { concurrency: 1, rateLimit: 1, retryAttempts: 2, retryBackoff: 'exponential' }
     };
     if (state.columnInfo) {
       state.config.tabs[state.columnInfo.tabGid] = {
@@ -720,7 +723,7 @@ function ensureConfig() {
     }
   }
   if (!state.config.settings) {
-    state.config.settings = { concurrency: 1, rateLimit: 5, retryAttempts: 2, retryBackoff: 'exponential' };
+    state.config.settings = { concurrency: 1, rateLimit: 1, retryAttempts: 2, retryBackoff: 'exponential' };
   }
   if (!state.config.scripts) {
     state.config.scripts = {};
@@ -1108,7 +1111,7 @@ function renderSourceEditorContent() {
 
   h += '<div class="section"><div class="section-title">Column Mappings</div>';
   h += '<p class="field-hint" style="margin-bottom:8px">Map destination columns to JSONPath per item. Use $.field or literal values.</p>';
-  h += buildKvList('src_columns', s.columns || {}, 'Column Header', '$.field');
+  h += buildKvList('src_columns', s.columns || {}, 'e.g. Email', 'e.g. $.email');
   h += '</div>';
 
   h += '<div class="section"><div class="section-title">Deduplication</div>';
@@ -1350,7 +1353,7 @@ function showSettings() {
 
   h += '<div class="section"><div class="section-title">Execution</div>';
   h += field('Concurrency', '<input class="field-input" type="number" min="1" name="concurrency" value="' + esc(s.concurrency) + '">', 'Number of rows to process in parallel');
-  h += field('Rate Limit', '<input class="field-input" type="number" min="0" step="0.1" name="rateLimit" value="' + esc(s.rateLimit) + '">', 'Max requests per second');
+  h += field('Rate Limit', '<input class="field-input" type="number" min="0" step="0.1" name="rateLimit" value="' + esc(s.rateLimit) + '">', 'Seconds between requests (e.g. 1 = one per second)');
   h += '</div>';
 
   h += '<div class="section"><div class="section-title">Retries</div>';
@@ -1544,7 +1547,7 @@ function buildHttpFields(a) {
   h += '</div>';
 
   h += '<div class="section"><div class="section-title">Error Handling</div>';
-  h += buildKvList('onError', flattenOnError(a.onError), 'HTTP Code', 'Action (skip / retry)');
+  h += buildKvList('onError', flattenOnError(a.onError), 'e.g. 404', 'e.g. skip or {"write":"N/A"}');
   h += '</div>';
 
   return h;
@@ -1620,7 +1623,7 @@ function buildExecFields(a) {
   h += '</div>';
 
   h += '<div class="section"><div class="section-title">Error Handling</div>';
-  h += buildKvList('onError', flattenOnError(a.onError), 'Code', 'Action');
+  h += buildKvList('onError', flattenOnError(a.onError), 'e.g. 1', 'e.g. skip or {"write":"error"}');
   h += '</div>';
   return h;
 }
@@ -1631,7 +1634,7 @@ function buildLookupFields(a) {
   h += '</div>';
 
   h += '<div class="section"><div class="section-title">Match</div>';
-  h += field('Match Column', '<input class="field-input" name="matchColumn" value="' + esc(a.matchColumn || '') + '" placeholder="Column header in source tab">');
+  h += field('Match Column', '<input class="field-input" name="matchColumn" value="' + esc(a.matchColumn || '') + '" placeholder="e.g. Clean Domain">');
   h += field('Match Value', '<input class="field-input" name="matchValue" value="' + esc(a.matchValue || '') + '" placeholder="Clean Domain">',
     'Column name from current row, or template like {{row.email}}');
   h += field('Operator', '<select class="field-select" name="matchOperator">' +
@@ -1640,17 +1643,10 @@ function buildLookupFields(a) {
 
   var rt = a.returnType || 'boolean';
   h += '<div class="section"><div class="section-title">Return</div>';
-  h += field('Return Type', '<select class="field-select" name="returnType" onchange="toggleLookupReturn(this.value)">' +
+  h += field('Return Type', '<select class="field-select" name="returnType">' +
     '<option value="boolean"' + (rt === 'boolean' ? ' selected' : '') + '>Boolean \u2014 true/false if match found</option>' +
     '<option value="count"' + (rt === 'count' ? ' selected' : '') + '>Count \u2014 number of matching rows</option>' +
-    '<option value="value"' + (rt === 'value' ? ' selected' : '') + '>Value \u2014 a column value from the match</option>' +
     '<option value="rows"' + (rt === 'rows' ? ' selected' : '') + '>Rows \u2014 JSON array of full matching rows</option></select>');
-  h += '<div id="lookup-return-column" style="' + (rt === 'value' ? '' : 'display:none') + '">';
-  h += field('Return Column', '<input class="field-input" name="returnColumn" value="' + esc(a.returnColumn || '') + '" placeholder="Column header to return">');
-  h += field('Match Mode', '<select class="field-select" name="matchMode">' +
-    '<option value="first"' + ((a.matchMode || 'first') === 'first' ? ' selected' : '') + '>First match</option>' +
-    '<option value="all"' + (a.matchMode === 'all' ? ' selected' : '') + '>All matches (JSON array)</option></select>');
-  h += '</div>';
   h += '</div>';
   return h;
 }
@@ -1661,7 +1657,7 @@ function buildWriteFields(a) {
   h += '</div>';
 
   h += '<div class="section"><div class="section-title">Column Mappings</div>';
-  h += buildKvList('columns', a.columns || {}, 'Dest Header', 'Value Template');
+  h += buildKvList('columns', a.columns || {}, 'e.g. Full Name', 'e.g. {{item.person.name}}');
   h += '</div>';
 
   h += '<div class="section"><div class="section-title">Array Expansion (optional)</div>';
@@ -1786,7 +1782,7 @@ function buildAiFields(a) {
   h += '</div>';
 
   h += '<div class="section"><div class="section-title">Error Handling</div>';
-  h += buildKvList('onError', a.onError || {}, 'Exit Code', 'Action (skip / {write: "value"})');
+  h += buildKvList('onError', a.onError || {}, 'e.g. 1', 'e.g. skip or {"write":"error"}');
   h += '</div>';
 
   return h;
@@ -1989,10 +1985,7 @@ function buildTabSelect(name, current) {
   return h + '</select>';
 }
 
-function toggleLookupReturn(type) {
-  var el = document.getElementById('lookup-return-column');
-  if (el) el.style.display = type === 'value' ? '' : 'none';
-}
+
 
 function buildKvList(name, obj, keyLabel, valLabel) {
   var h = '<div class="kv-list" data-kv="' + esc(name) + '">';
@@ -2136,13 +2129,7 @@ function readFormAction() {
       a.matchValue = getVal('matchValue');
       var mOp = getVal('matchOperator');
       if (mOp && mOp !== 'equals') a.matchOperator = mOp;
-      var rType = getVal('returnType') || 'boolean';
-      a.returnType = rType;
-      if (rType === 'value') {
-        a.returnColumn = getVal('returnColumn');
-        var mMode = getVal('matchMode');
-        if (mMode && mMode !== 'first') a.matchMode = mMode;
-      }
+      a.returnType = getVal('returnType') || 'boolean';
       break;
 
     case 'write':
