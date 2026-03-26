@@ -858,13 +858,7 @@ function showOverview() {
   var actions = getActions();
   var headers = (state.columnInfo && state.columnInfo.headers) || [];
   var colMap = getColumnIdMap();
-
-  // Build action lookup: column name → action
-  var actionByColumn = {};
-  for (var i = 0; i < actions.length; i++) {
-    var colName = colMap[actions[i].target] || actions[i].target;
-    actionByColumn[colName] = actions[i];
-  }
+  var selectedCol = state.columnInfo ? state.columnInfo.column : '';
 
   var h = '';
 
@@ -872,44 +866,88 @@ function showOverview() {
     h += '<div class="disabled-banner">Processing is paused. No actions will run until re-enabled in Settings.</div>';
   }
 
-  if (headers.length === 0 && actions.length === 0) {
-    h += '<div class="empty-state">';
-    h += '<div class="empty-state-title">No columns found</div>';
-    h += '<p>Add column headers to your sheet, then click Sync.</p>';
-    h += '</div>';
-  } else {
-    // Show every column in sheet order
-    for (var j = 0; j < headers.length; j++) {
-      var hdr = headers[j];
-      var action = actionByColumn[hdr];
-      h += '<div class="column-row" onclick="onColumnClick(\'' + esc(hdr).replace(/'/g, "\\'") + '\')">';
-      h += '<span class="column-row-name">' + esc(hdr) + '</span>';
-      if (action) {
-        var dt = displayType(action);
-        h += '<span class="badge badge-' + esc(dt) + '">' + esc(dt === 'ai' ? 'AI' : dt) + '</span>';
+  // Column dropdown
+  h += '<div style="margin-bottom:12px">';
+  h += '<span class="field-label">Column</span>';
+  h += '<select class="field-select" style="width:100%" id="action-col-select" onchange="onActionColumnChange(this.value)">';
+  h += '<option value="">Select a column...</option>';
+
+  // Build action lookup for pill display
+  var actionByColumn = {};
+  for (var i = 0; i < actions.length; i++) {
+    var colName = colMap[actions[i].target] || actions[i].target;
+    actionByColumn[colName] = actions[i];
+  }
+
+  for (var j = 0; j < headers.length; j++) {
+    var hdr = headers[j];
+    var action = actionByColumn[hdr];
+    var marker = action ? ' [' + displayType(action).toUpperCase() + ']' : '';
+    var sel = (hdr === selectedCol) ? ' selected' : '';
+    h += '<option value="' + esc(hdr) + '"' + sel + '>' + esc(hdr) + marker + '</option>';
+  }
+  h += '</select></div>';
+
+  // Show editor inline if a column is selected
+  if (selectedCol && selectedCol !== '') {
+    var existingAction = actionByColumn[selectedCol];
+    if (existingAction) {
+      // Edit existing action inline
+      var a = deepCopy(existingAction);
+      if (a.type === 'exec' && (a._ai_runtime || (a.command && (a.command.indexOf('claude -p') >= 0 || a.command.indexOf('codex exec') >= 0)))) {
+        a.type = 'ai';
       }
-      h += '</div>';
+      state.editingAction = resolveActionForDisplay(a);
+      state.originalAction = deepCopy(existingAction);
+      h += buildInlineEditor(true);
+    } else {
+      // Create new action inline
+      var newAction = { id: generateId(), type: 'http', target: selectedCol, method: 'GET', url: '', extract: '' };
+      state.editingAction = newAction;
+      state.originalAction = null;
+      h += buildInlineEditor(false);
     }
   }
 
   safeSetHTML(document.getElementById('content'), h);
-  renderFooter([]);
+
+  if (selectedCol && selectedCol !== '') {
+    renderFooter([
+      state.originalAction ? { label: 'Delete', cls: 'btn-danger', action: 'confirmDelete()' } : null,
+      'spacer',
+      { label: state.originalAction ? 'Save' : 'Create', cls: 'btn-primary', action: 'saveAction()' }
+    ].filter(Boolean));
+  } else {
+    renderFooter([]);
+  }
 }
 
-/** Click a column row: edit existing action or create new one */
-function onColumnClick(columnName) {
-  var actions = getActions();
-  var colMap = getColumnIdMap();
-  for (var i = 0; i < actions.length; i++) {
-    var name = colMap[actions[i].target] || actions[i].target;
-    if (name === columnName) {
-      state.columnInfo.column = columnName;
-      showEditor(actions[i], columnName);
-      return;
-    }
-  }
-  // No action — create new
-  showCreateWithColumn(columnName);
+function buildInlineEditor(isEdit) {
+  var a = state.editingAction;
+  var h = '';
+
+  h += '<div class="section"><div class="section-title">Action</div>';
+  h += field('Type', buildTypeSelect(a.type));
+  h += '</div>';
+
+  h += buildTypeFields(a);
+
+  h += '<div class="section"><div class="section-title">Environment Variables</div>';
+  h += '<p class="field-hint" style="margin-bottom:8px">Per-action env var overrides.</p>';
+  h += buildKvList('actionEnv', a.env || {}, 'e.g. API_KEY', 'e.g. sk-abc123');
+  h += '</div>';
+
+  h += '<div class="section"><div class="section-title">Run Conditions</div>';
+  h += field('Only run if', '<textarea class="field-textarea" name="when" placeholder="e.g. {{domain}} !== &#39;&#39;">' + esc(a.when || '') + '</textarea>',
+    'JavaScript expression. Use {{column}} for cell values.');
+  h += '</div>';
+
+  return h;
+}
+
+function onActionColumnChange(col) {
+  if (state.columnInfo) state.columnInfo.column = col;
+  showOverview();
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
