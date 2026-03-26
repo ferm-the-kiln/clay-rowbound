@@ -860,6 +860,18 @@ function showOverview() {
     h += '<p>Select a column and add an action to get started.</p>';
     h += '</div>';
   } else {
+    // Sort actions by their column position in the sheet (left to right)
+    var headers = (state.columnInfo && state.columnInfo.headers) || [];
+    var colMap = getColumnIdMap();
+    actions.sort(function(a, b) {
+      var nameA = colMap[a.target] || a.target;
+      var nameB = colMap[b.target] || b.target;
+      var posA = headers.indexOf(nameA);
+      var posB = headers.indexOf(nameB);
+      if (posA === -1) posA = 9999;
+      if (posB === -1) posB = 9999;
+      return posA - posB;
+    });
     for (var i = 0; i < actions.length; i++) {
       var a = actions[i];
       h += '<div class="action-item" onclick="editActionByIndex(' + i + ')">';
@@ -867,10 +879,7 @@ function showOverview() {
       var dt = displayType(a);
       h += '<span class="badge badge-' + esc(dt) + '">' + esc(dt === 'ai' ? 'AI' : dt) + '</span>';
       h += '<span class="action-item-title">' + esc(resolveColumnName(a.target)) + '</span>';
-      h += '<div class="action-item-reorder">';
-      if (i > 0) h += '<button onclick="event.stopPropagation();moveAction(' + i + ',-1)" title="Move up">&#9650;</button>';
-      if (i < actions.length - 1) h += '<button onclick="event.stopPropagation();moveAction(' + i + ',1)" title="Move down">&#9660;</button>';
-      h += '</div></div>';
+      h += '</div>';
       h += '<div class="action-item-meta">' + esc(actionSummary(a)) + '</div>';
       if (a.when) h += '<div class="action-item-meta">if: ' + esc(resolveIds(a.when)) + '</div>';
       h += '</div>';
@@ -910,10 +919,7 @@ function showSources() {
       var sdt = displayType(s);
       h += '<span class="badge badge-src-' + esc(sdt) + '">' + esc(sdt === 'ai' ? 'AI' : sdt) + '</span>';
       h += '<span class="action-item-title">' + esc(s.id) + '</span>';
-      h += '<div class="action-item-reorder">';
-      if (i > 0) h += '<button onclick="event.stopPropagation();moveSource(' + i + ',-1)" title="Move up">&#9650;</button>';
-      if (i < sources.length - 1) h += '<button onclick="event.stopPropagation();moveSource(' + i + ',1)" title="Move down">&#9660;</button>';
-      h += '</div></div>';
+      h += '</div>';
       h += '<div class="action-item-meta">' + esc(sourceSummary(s)) + '</div>';
       h += '<div class="action-item-meta">' + esc(schedule) + (s.dedup ? ' \u00b7 dedup: ' + esc(s.dedup) : '') + '</div>';
       h += '</div>';
