@@ -960,12 +960,13 @@ function onActionColumnChange(col) {
 /* ═══════════════════════════════════════════════════════════════════════════
    VIEW: SOURCES
    ═══════════════════════════════════════════════════════════════════════════ */
+var _selectedSourceId = '';
+
 function showSources() {
   state.view = 'sources';
   state.lastListView = 'sources';
   restoreDefaultHeader();
   updateTabBar('sources');
-  
 
   var sources = getSources();
   var enabled = isTabEnabled();
@@ -975,30 +976,87 @@ function showSources() {
     h += '<div class="disabled-banner">Processing is paused. No sources will run until re-enabled in Settings.</div>';
   }
 
-  if (sources.length === 0) {
-    h += '<div class="empty-state">';
-    h += '<div class="empty-state-title">No sources configured</div>';
-    h += '<p>Sources create rows from external data — APIs, commands, or webhooks.</p>';
-    h += '</div>';
-  } else {
-    for (var i = 0; i < sources.length; i++) {
-      var s = sources[i];
-      var schedule = (s.type !== 'webhook') ? (s.schedule || 'manual') : 'webhook';
-      h += '<div class="action-item" onclick="editSourceByIndex(' + i + ')">';
-      h += '<div class="action-item-header">';
-      var sdt = displayType(s);
-      h += '<span class="badge badge-src-' + esc(sdt) + '">' + esc(sdt === 'ai' ? 'AI' : sdt) + '</span>';
-      h += '<span class="action-item-title">' + esc(s.id) + '</span>';
-      h += '</div>';
-      h += '</div>';
+  // Source dropdown
+  h += '<div style="margin-bottom:12px">';
+  h += '<div style="font-size:15px;color:#202124;font-weight:600;margin-bottom:6px">Source</div>';
+  h += '<select class="field-select" style="width:100%" id="source-select" onchange="onSourceSelect(this.value)">';
+  h += '<option value="">Select a source...</option>';
+  for (var i = 0; i < sources.length; i++) {
+    var s = sources[i];
+    var sdt = displayType(s);
+    var label = s.id + ' [' + (sdt === 'ai' ? 'AI' : sdt.toUpperCase()) + ']';
+    var sel = (s.id === _selectedSourceId) ? ' selected' : '';
+    h += '<option value="' + esc(s.id) + '"' + sel + '>' + esc(label) + '</option>';
+  }
+  h += '<option value="__new__">+ New source</option>';
+  h += '</select></div>';
+
+  // Inline editor if a source is selected
+  var showEditor = false;
+  if (_selectedSourceId === '__new__') {
+    var newSource = { id: generateId(), type: 'http', method: 'POST', url: '', extract: '$', columns: {}, schedule: 'manual' };
+    state.editingSource = newSource;
+    state.originalSource = null;
+    showEditor = true;
+  } else if (_selectedSourceId) {
+    var found = null;
+    for (var j = 0; j < sources.length; j++) {
+      if (sources[j].id === _selectedSourceId) { found = sources[j]; break; }
+    }
+    if (found) {
+      state.editingSource = deepCopy(found);
+      if (state.editingSource.type === 'exec' && state.editingSource._ai_runtime) {
+        state.editingSource.type = 'ai';
+      }
+      state.originalSource = deepCopy(found);
+      showEditor = true;
     }
   }
-  safeSetHTML(document.getElementById('content'), h);
-  renderFooter([
-    'spacer',
-    { label: '+ New Source', cls: 'btn-primary', action: 'showCreateSource()' }
-  ]);
+
+  if (showEditor) {
+    // renderSourceEditorContent writes to #content — so we call it first,
+    // then prepend our dropdown HTML
+    renderSourceEditorContent();
+    var contentEl = document.getElementById('content');
+    if (contentEl) {
+      var wrapper = document.createElement('div');
+      safeSetHTML(wrapper, h);
+      contentEl.insertBefore(wrapper, contentEl.firstChild);
+    }
+  } else {
+    safeSetHTML(document.getElementById('content'), h);
+  }
+
+  if (_selectedSourceId && _selectedSourceId !== '') {
+    var isNew = _selectedSourceId === '__new__';
+    renderFooter([
+      !isNew ? { label: 'Delete', cls: 'btn-danger', action: 'deleteSelectedSource()' } : null,
+      'spacer',
+      { label: isNew ? 'Create' : 'Save', cls: 'btn-primary', action: 'saveSource()' }
+    ].filter(Boolean));
+  } else {
+    renderFooter([]);
+  }
 }
+
+function onSourceSelect(val) {
+  _selectedSourceId = val;
+  showSources();
+}
+
+function deleteSelectedSource() {
+  if (!state.originalSource) return;
+  var sources = getSources();
+  var filtered = sources.filter(function(s) { return s.id !== state.originalSource.id; });
+  setSources(filtered);
+  _selectedSourceId = '';
+  state.editingSource = null;
+  state.originalSource = null;
+  persistConfig('Source deleted');
+  showSources();
+}
+
+
 
 function editSourceByIndex(idx) {
   var sources = getSources();
@@ -1218,7 +1276,12 @@ function onSourceTypeChange(newType) {
   if (newType === 'exec') { s.command = ''; }
   if (newType === 'script') { s.script = ''; s.args = []; s._script_runtime = 'python3'; s._script_code = ''; }
   if (newType === 'ai') { s._ai_runtime = 'claude'; s._ai_prompt = ''; s._ai_outputFormat = 'fields'; }
-  renderSourceEditorContent();
+  // If in inline source view, re-render the whole sources view
+  if (state.view === 'sources') {
+    showSources();
+  } else {
+    renderSourceEditorContent();
+  }
 }
 
 function readFormSource() {
