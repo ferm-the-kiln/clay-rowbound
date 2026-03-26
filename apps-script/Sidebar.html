@@ -790,13 +790,12 @@ function renderHeader(title, opts) {
     var actions = getActions();
     var configured = {};
     for (var i = 0; i < actions.length; i++) configured[actions[i].target] = true;
-    h += '<div id="header-nav"><label class="header-nav-label">Column</label><select onchange="switchColumn(this.value)">';
+    h += '<div id="header-nav"><div style="font-size:11px;color:#80868b;margin-bottom:4px">Column</div><select class="field-select" style="width:100%" onchange="switchColumn(this.value)">';
     var headers = state.columnInfo.headers || [];
     for (var j = 0; j < headers.length; j++) {
       var hdr = headers[j];
       var sel = (hdr === state.columnInfo.column) ? ' selected' : '';
-      var dot = configured[hdr] ? '\u25cf ' : '\u25cb ';
-      h += '<option value="' + esc(hdr) + '"' + sel + '>' + dot + esc(hdr) + '</option>';
+      h += '<option value="' + esc(hdr) + '"' + sel + '>' + esc(hdr) + '</option>';
     }
     h += '</select></div>';
   }
