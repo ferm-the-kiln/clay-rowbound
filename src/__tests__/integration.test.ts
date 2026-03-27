@@ -26,8 +26,12 @@ class InMemoryAdapter implements Adapter {
     return this.rows;
   }
 
-  async writeCell(_ref: SheetRef, update: CellUpdate): Promise<void> {
-    this.writtenBatches.push({ ref: _ref, updates: [update] });
+  async writeCell(ref: SheetRef, update: CellUpdate): Promise<void> {
+    this.writtenBatches.push({ ref, updates: [update] });
+    const rowIndex = update.row - 2; // sheet row 2 = data index 0
+    if (this.rows[rowIndex]) {
+      this.rows[rowIndex]![update.column] = update.value;
+    }
   }
 
   async writeBatch(ref: SheetRef, updates: CellUpdate[]): Promise<void> {
@@ -330,15 +334,17 @@ describe("Integration: full pipeline without mocking core modules", () => {
       expect(result.updates).toBe(4);
       expect(result.errors).toHaveLength(0);
 
-      // Row 1 updates
+      expect(adapter.writtenBatches).toHaveLength(4);
       expect(adapter.writtenBatches[0]!.updates).toEqual([
         { row: 2, column: "full_name", value: "Alice Smith" },
+      ]);
+      expect(adapter.writtenBatches[1]!.updates).toEqual([
         { row: 2, column: "domain", value: "acme.com" },
       ]);
-
-      // Row 2 updates
-      expect(adapter.writtenBatches[1]!.updates).toEqual([
+      expect(adapter.writtenBatches[2]!.updates).toEqual([
         { row: 3, column: "full_name", value: "Bob Jones" },
+      ]);
+      expect(adapter.writtenBatches[3]!.updates).toEqual([
         { row: 3, column: "domain", value: "beta.io" },
       ]);
     });
@@ -371,8 +377,11 @@ describe("Integration: full pipeline without mocking core modules", () => {
       });
 
       expect(result.updates).toBe(2);
+      expect(adapter.writtenBatches).toHaveLength(2);
       expect(adapter.writtenBatches[0]!.updates).toEqual([
         { row: 2, column: "full_name", value: "Alice Smith" },
+      ]);
+      expect(adapter.writtenBatches[1]!.updates).toEqual([
         { row: 2, column: "greeting", value: "Hello, Alice Smith!" },
       ]);
     });
@@ -751,11 +760,8 @@ describe("Integration: full pipeline without mocking core modules", () => {
       expect(result.updates).toBe(3);
       expect(result.errors).toHaveLength(0);
 
-      const updates = adapter.writtenBatches[0]!.updates;
-      // Dependency sort may reorder actions (email has no deps, upper_company
-      // depends on company_name) — check values regardless of order
-      expect(updates).toHaveLength(3);
-      expect(updates).toEqual(
+      expect(adapter.writtenBatches).toHaveLength(3);
+      expect(adapter.writtenBatches.map((batch) => batch.updates[0])).toEqual(
         expect.arrayContaining([
           { row: 2, column: "company_name", value: "Acme Corp" },
           { row: 2, column: "upper_company", value: "ACME CORP" },

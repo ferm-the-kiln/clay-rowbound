@@ -47,7 +47,9 @@ class MockAdapter implements Adapter {
     return this.rows;
   }
 
-  async writeCell(_ref: SheetRef, _update: CellUpdate): Promise<void> {}
+  async writeCell(ref: SheetRef, update: CellUpdate): Promise<void> {
+    this.writtenBatches.push({ ref, updates: [update] });
+  }
 
   async writeBatch(ref: SheetRef, updates: CellUpdate[]): Promise<void> {
     this.writtenBatches.push({ ref, updates });

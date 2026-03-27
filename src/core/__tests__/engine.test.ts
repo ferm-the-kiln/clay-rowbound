@@ -55,7 +55,9 @@ class MockAdapter implements Adapter {
     return this.rows;
   }
 
-  async writeCell(_ref: SheetRef, _update: CellUpdate): Promise<void> {}
+  async writeCell(ref: SheetRef, update: CellUpdate): Promise<void> {
+    this.writtenBatches.push({ ref, updates: [update] });
+  }
 
   async writeBatch(ref: SheetRef, updates: CellUpdate[]): Promise<void> {
     this.writtenBatches.push({ ref, updates });
@@ -321,10 +323,14 @@ describe("runPipeline", () => {
     expect(result.updates).toBe(3);
     expect(result.errors).toHaveLength(0);
 
-    const updates = adapter.writtenBatches[0]!.updates;
-    expect(updates).toEqual([
+    expect(adapter.writtenBatches).toHaveLength(3);
+    expect(adapter.writtenBatches[0]!.updates).toEqual([
       { row: 2, column: "full_name", value: "Alice Smith" },
+    ]);
+    expect(adapter.writtenBatches[1]!.updates).toEqual([
       { row: 2, column: "title", value: "VP Sales" },
+    ]);
+    expect(adapter.writtenBatches[2]!.updates).toEqual([
       { row: 2, column: "email", value: "alice@acme.com" },
     ]);
   });
@@ -404,13 +410,13 @@ describe("runPipeline", () => {
     });
 
     expect(result.updates).toBe(2);
-    const updates = adapter.writtenBatches[0]!.updates;
-    expect(updates[0]).toEqual({
+    expect(adapter.writtenBatches).toHaveLength(2);
+    expect(adapter.writtenBatches[0]!.updates[0]).toEqual({
       row: 2,
       column: "full_name",
       value: "Alice Smith",
     });
-    expect(updates[1]).toEqual({
+    expect(adapter.writtenBatches[1]!.updates[0]).toEqual({
       row: 2,
       column: "greeting",
       value: "Hello, Alice Smith!",

@@ -226,7 +226,7 @@ async function executeHttpAction(
  * Execution flow per row:
  * 1. Read row data (header -> value map)
  * 2. For each action: evaluate condition, execute, update in-memory row state
- * 3. Batch-write all cell updates for the row
+ * 3. Write each successful action update immediately before continuing
  * 4. Fire progress callbacks
  */
 export async function runPipeline(
@@ -474,11 +474,16 @@ export async function runPipeline(
           }
 
           // Sheet row = data index + 2 (row 1 is headers)
-          rowUpdates.push({
+          const update = {
             row: i + 2,
             column: columnName,
             value,
-          });
+          };
+          rowUpdates.push(update);
+
+          if (!dryRun) {
+            await adapter.writeCell(ref, update);
+          }
         }
 
         options.onActionComplete?.(i, action.id, value);
@@ -492,11 +497,6 @@ export async function runPipeline(
         options.onError?.(i, action.id, err);
         options.onActionComplete?.(i, action.id, null);
       }
-    }
-
-    // Write batch for this row
-    if (rowUpdates.length > 0 && !dryRun) {
-      await adapter.writeBatch(ref, rowUpdates);
     }
 
     result.updates += rowUpdates.length;
