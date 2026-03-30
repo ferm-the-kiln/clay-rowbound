@@ -134,7 +134,11 @@ export async function executeAiAction(
     // Read prompt from temp file, pass as argument via $(...), redirect stdin
     // from /dev/null so interactive tools (browser, etc.) work properly.
     command = "claude -p";
-    if (action.bare !== false) command += " --bare";
+    // --bare strips OAuth auth (Claude Code bug #38022), so we use
+    // --system-prompt "" to achieve a clean prompt without breaking login.
+    // The env vars CLAUDE_CODE_DISABLE_AUTO_MEMORY and
+    // ENABLE_CLAUDEAI_MCP_SERVERS strip remaining context.
+    if (action.bare !== false) command += ' --system-prompt ""';
     if (action.model) command += ` --model ${action.model}`;
     const maxTurns = action.maxTurns ?? 25;
     command += ` --max-turns ${maxTurns}`;
@@ -150,12 +154,18 @@ export async function executeAiAction(
   try {
     // AI actions need PATH and HOME to find claude/codex CLIs.
     // Merge only essential system vars — don't leak all of process.env.
-    const aiEnv = {
+    const aiEnv: Record<string, string> = {
       ...context.env,
       PATH: process.env.PATH ?? "/usr/local/bin:/usr/bin:/bin",
       HOME: process.env.HOME ?? "",
       SHELL: process.env.SHELL ?? "/bin/sh",
     };
+    // In bare mode, strip auto-memory and MCP servers to keep prompts clean
+    // (workaround for --bare breaking OAuth, Claude Code bug #38022)
+    if (action.bare !== false) {
+      aiEnv.CLAUDE_CODE_DISABLE_AUTO_MEMORY = "1";
+      aiEnv.ENABLE_CLAUDEAI_MCP_SERVERS = "false";
+    }
     const result = await executeCommand(command, {
       timeout,
       signal: options.signal,
