@@ -74,7 +74,11 @@ function parseGwsResponse<T>(
 ): T {
   let raw: unknown;
   try {
-    raw = JSON.parse(output);
+    // gws may print non-JSON diagnostics (e.g. keyring backend info) to stdout
+    // before the actual JSON response. Strip any leading non-JSON lines.
+    const jsonStart = output.search(/[[{]/);
+    const cleaned = jsonStart > 0 ? output.slice(jsonStart) : output;
+    raw = JSON.parse(cleaned);
   } catch {
     throw new Error(`gws returned invalid JSON for ${context}`);
   }

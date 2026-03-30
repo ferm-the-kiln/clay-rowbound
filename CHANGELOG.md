@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.2] - 2026-03-30
+
+### Added
+
+- **`ifEmpty` for HTTP actions** — write a fallback value (e.g. "❌") when the JSONPath extract returns empty, instead of writing nothing.
+- **`bare` flag for AI actions** — passes `--bare` to `claude -p`, skipping CLAUDE.md/settings/MCP discovery for up to 10× faster startup. Enabled by default; set `"bare": false` to load local config.
+- **Sidebar UI** — added `ifEmpty` field for HTTP actions and `bare` checkbox for AI actions.
+
+### Fixed
+
+- **gws keyring stdout fix** — `gws` CLI on some systems (notably Linux with GNOME/KDE keyring) prints diagnostic lines like `Using keyring: backend: ...` to stdout before JSON. Rowbound now strips non-JSON prefixes before parsing, preventing `invalid JSON` errors on writeback.
+
 ## [0.1.0] - 2026-03-16
 
 ### Added

@@ -51,6 +51,8 @@ export interface HttpAction {
   headers?: Record<string, string>;
   body?: unknown;
   extract: string;
+  /** Value to write when the extract returns empty/null (e.g. "❌") */
+  ifEmpty?: string;
   onError?: OnErrorConfig;
   runSettings?: ActionRunSettings;
 }
@@ -287,6 +289,9 @@ export interface AiAction {
   maxTurns?: number;
   /** Enable tools (web search, file read, etc.). Default: true */
   tools?: boolean;
+  /** Pass --bare to claude -p, skipping CLAUDE.md/settings/MCP discovery for faster startup.
+   *  Default: true. Set to false to load local config. */
+  bare?: boolean;
   /** Prompt template. Supports {{row.x}} and {{env.X}} references. */
   prompt: string;
   /** Named output fields, each maps to a target column.

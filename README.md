@@ -83,10 +83,10 @@ Column names are automatically resolved to stable IDs when you run `rowbound syn
 - **Scheduling** — run sources manually, hourly, daily, or weekly
 
 ### Actions — Enrich existing rows
-- **HTTP actions** — call any REST API with templated URLs, headers, and bodies; extract values with JSONPath
+- **HTTP actions** — call any REST API with templated URLs, headers, and bodies; extract values with JSONPath; `ifEmpty` fallback when extract returns nothing
 - **Waterfall actions** — try multiple providers in order until one returns a result (e.g., Clearbit → Apollo → Hunter)
 - **Formula actions** — compute derived values with JavaScript expressions using `{{Column Name}}` references
-- **AI actions** — run headless Claude or Codex per row with configurable model, max turns, and tools
+- **AI actions** — run headless Claude or Codex per row with configurable model, max turns, tools, and `bare` mode for faster startup
 - **Exec actions** — run shell commands and capture stdout
 - **Script actions** — run reusable named scripts stored in config; supports bash, python3, and node runtimes
 - **Lookup actions** — pull data from other tabs (boolean, count, or full row JSON)
@@ -334,6 +334,7 @@ Call a REST API and extract a value with JSONPath.
   "url": "https://api.clearbit.com/v2/companies/find?domain={{row.domain}}",
   "headers": { "Authorization": "Bearer {{env.CLEARBIT_API_KEY}}" },
   "extract": "$.name",
+  "ifEmpty": "❌",
   "onError": { "404": "skip", "429": "skip", "default": { "write": "ERROR" } }
 }
 ```

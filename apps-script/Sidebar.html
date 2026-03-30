@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- ROWBOUND_VERSION: 7 -->
 <html>
 <head>
 <base target="_top">
@@ -1611,6 +1612,8 @@ function buildHttpFields(a) {
   h += '<div class="section"><div class="section-title">Response</div>';
   h += field('Extract (JSONPath)', '<input class="field-input" name="extract" value="' + esc(a.extract || '') + '" placeholder="$.data.name">',
     'JSONPath expression to extract value from response');
+  h += field('If empty, write', '<input class="field-input" name="ifEmpty" value="' + esc(a.ifEmpty || '') + '" placeholder="e.g. \u274c">',
+    'Value to write when the extract returns nothing. Leave blank to write nothing.');
   h += '</div>';
 
   h += '<div class="section"><div class="section-title">Error Handling</div>';
@@ -1774,6 +1777,7 @@ function buildAiFields(a) {
   var maxTurns = a._ai_maxTurns || '25';
   var prompt = a._ai_prompt || '';
   var toolsFlag = a._ai_tools !== false;
+  var bareFlag = a._ai_bare !== false;
 
   // If this was a previously saved AI action (stored as exec), parse it back
   if (a.type === 'ai' && a.command && !a._ai_prompt) {
@@ -1805,6 +1809,9 @@ function buildAiFields(a) {
   h += field('Tools', '<select class="field-select" name="_ai_tools">' +
     '<option value="true"' + (toolsFlag ? ' selected' : '') + '>Enabled \u2014 web search, file read, etc.</option>' +
     '<option value="false"' + (!toolsFlag ? ' selected' : '') + '>Disabled \u2014 text only</option></select>');
+  h += field('Bare', '<label style="display:flex;align-items:center;gap:6px;cursor:pointer">' +
+    '<input type="checkbox" name="_ai_bare"' + (bareFlag ? ' checked' : '') + '> Skip CLAUDE.md / settings / MCP discovery</label>',
+    'Passes --bare to claude -p for up to 10\u00d7 faster startup. Recommended for non-interactive use.');
   h += '</div>';
 
   h += '<div class="section"><div class="section-title">Prompt</div>';
@@ -2118,6 +2125,8 @@ function readFormAction() {
       a.method = getVal('method') || 'GET';
       a.url = getVal('url');
       a.extract = getVal('extract');
+      var ifEmpty = getVal('ifEmpty').trim();
+      if (ifEmpty) a.ifEmpty = ifEmpty;
       var headers = readKvList('headers');
       if (Object.keys(headers).length > 0) a.headers = headers;
       var bodyStr = getVal('body').trim();
@@ -2195,6 +2204,7 @@ function readFormAction() {
       var aiModel = getVal('_ai_model').trim();
       var aiMaxTurns = parseInt(getVal('_ai_maxTurns').trim() || '25');
       var aiTools = getVal('_ai_tools') === 'true';
+      var aiBare = document.querySelector('[name="_ai_bare"]') ? document.querySelector('[name="_ai_bare"]').checked : true;
       var aiPrompt = getVal('_ai_prompt').trim();
 
       // Read output definitions
@@ -2222,6 +2232,7 @@ function readFormAction() {
       if (aiModel) a.model = aiModel;
       a.maxTurns = aiMaxTurns;
       a.tools = aiTools;
+      a.bare = aiBare;
       a.prompt = aiPrompt;
       if (Object.keys(aiOutputs).length > 0) a.outputs = aiOutputs;
       a.outputFormat = aiOutputFormat;
@@ -2233,6 +2244,7 @@ function readFormAction() {
       a._ai_maxTurns = String(aiMaxTurns);
       a._ai_prompt = aiPrompt;
       a._ai_tools = aiTools;
+      a._ai_bare = aiBare;
       a._ai_outputFormat = aiOutputFormat;
       a._ai_outputFields = aiOutputFields;
       a._ai_outputSchema = aiOutputSchema;

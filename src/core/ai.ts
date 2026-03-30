@@ -134,6 +134,7 @@ export async function executeAiAction(
     // Read prompt from temp file, pass as argument via $(...), redirect stdin
     // from /dev/null so interactive tools (browser, etc.) work properly.
     command = "claude -p";
+    if (action.bare !== false) command += " --bare";
     if (action.model) command += ` --model ${action.model}`;
     const maxTurns = action.maxTurns ?? 25;
     command += ` --max-turns ${maxTurns}`;

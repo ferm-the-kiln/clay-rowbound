@@ -217,7 +217,8 @@ async function executeHttpAction(
   }
 
   const value = extractValue(response.data, action.extract);
-  return value !== "" ? value : null;
+  if (value !== "") return value;
+  return action.ifEmpty ?? null;
 }
 
 /**
