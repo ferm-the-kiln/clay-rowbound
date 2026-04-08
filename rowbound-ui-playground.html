@@ -1,0 +1,1271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rowbound UI Playground</title>
+<link rel="stylesheet" href="https://rsms.me/inter/inter.css">
+<style>
+/* ═══════════════════════════════════════════════════════════════════════════
+   PLAYGROUND SHELL
+   ═══════════════════════════════════════════════════════════════════════════ */
+:root {
+  --shell-bg: #09090b;
+  --shell-surface: #18181b;
+  --shell-text: #a1a1aa;
+  --shell-muted: #71717a;
+  --shell-border: #27272a;
+  --shell-accent: #2563eb;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; }
+body {
+  font-family: 'InterVariable', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+  font-optical-sizing: auto;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background: var(--shell-bg);
+  color: var(--shell-text);
+  overflow-x: auto;
+}
+
+/* Header */
+.playground-header {
+  padding: 24px 40px 20px;
+  border-bottom: 1px solid var(--shell-border);
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+}
+.playground-header h1 {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #e4e4e7;
+  letter-spacing: -0.01em;
+}
+.playground-header span {
+  font-size: 0.75rem;
+  color: var(--shell-muted);
+}
+
+/* Version toggle */
+.version-toggle {
+  margin-left: auto;
+  display: flex;
+  background: var(--shell-surface);
+  border: 1px solid var(--shell-border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.version-toggle button {
+  padding: 6px 14px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  background: transparent;
+  border: none;
+  color: var(--shell-muted);
+  cursor: pointer;
+  font-family: inherit;
+}
+.version-toggle button.active {
+  background: var(--shell-accent);
+  color: #fff;
+}
+.version-toggle button:hover:not(.active) {
+  color: var(--shell-text);
+}
+
+/* Panels */
+.panels {
+  display: flex;
+  gap: 28px;
+  padding: 32px 40px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+.panel-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.panel-label {
+  font-size: 0.6875rem;
+  font-weight: 500;
+  color: var(--shell-muted);
+  text-align: center;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SIDEBAR FRAME
+   ═══════════════════════════════════════════════════════════════════════════ */
+.sidebar-frame {
+  /* Design tokens */
+  --rb-text: #111827;
+  --rb-text-secondary: #374151;
+  --rb-text-tertiary: #6b7280;
+  --rb-text-placeholder: #9ca3af;
+  --rb-border: rgba(0,0,0,0.07);
+  --rb-border-input: rgba(0,0,0,0.12);
+  --rb-border-hover: rgba(0,0,0,0.20);
+  --rb-bg-hover: rgba(0,0,0,0.03);
+  --rb-bg-active: rgba(0,0,0,0.05);
+  --rb-accent: #2563eb;
+  --rb-accent-hover: #1d4ed8;
+  --rb-accent-active: #1e40af;
+  --rb-accent-focus: rgba(37,99,235,0.18);
+  --rb-success: #16a34a;
+  --rb-danger: #dc2626;
+
+  width: 400px;
+  height: 640px;
+  background: #fff;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow:
+    0 0 0 1px rgba(255,255,255,0.06),
+    0 1px 2px rgba(0,0,0,0.2),
+    0 8px 24px rgba(0,0,0,0.35);
+  display: flex;
+  flex-direction: column;
+  font-family: 'InterVariable', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+  font-size: 0.8125rem;
+  color: var(--rb-text);
+  position: relative;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   DESIGN SYSTEM
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* --- Scrollable area --- */
+.sidebar-frame .rb-scroll {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.sidebar-frame .rb-scroll::-webkit-scrollbar { width: 5px; }
+.sidebar-frame .rb-scroll::-webkit-scrollbar-track { background: transparent; }
+.sidebar-frame .rb-scroll::-webkit-scrollbar-thumb {
+  background: rgba(0,0,0,0.12);
+  border-radius: 9999px;
+}
+.sidebar-frame .rb-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(0,0,0,0.20);
+}
+
+/* --- Header --- */
+.sidebar-frame .rb-header {
+  padding: 14px 0 0 0;
+  flex-shrink: 0;
+}
+.sidebar-frame .rb-header-title {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 16px 2px;
+  color: var(--rb-text);
+  letter-spacing: -0.01em;
+}
+
+/* --- Sheet tab selector --- */
+.sidebar-frame .rb-sheet-selector {
+  padding: 10px 16px 4px;
+}
+.sidebar-frame .rb-sheet-selector-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 6px;
+}
+.sidebar-frame .rb-sheet-selector-title {
+  font-size: 0.6875rem;
+  color: var(--rb-text-tertiary);
+  font-weight: 600;
+  flex: 1;
+  letter-spacing: 0.02em;
+}
+.sidebar-frame .rb-sync-btn {
+  font-size: 0.75rem;
+  padding: 5px 10px;
+  cursor: pointer;
+  color: var(--rb-text-tertiary);
+  background: #fff;
+  border: 1px solid var(--rb-border-input);
+  border-radius: 6px;
+  font-weight: 500;
+  font-family: inherit;
+}
+.sidebar-frame .rb-sync-btn:hover { background: var(--rb-bg-hover); color: var(--rb-text); }
+.sidebar-frame .rb-sync-btn:focus-visible { outline: 2px solid var(--rb-accent); outline-offset: 1px; }
+
+/* --- Content & Footer --- */
+.sidebar-frame .rb-content {
+  padding: 16px;
+}
+.sidebar-frame .rb-footer {
+  padding: 12px 16px;
+  border-top: 1px solid var(--rb-border);
+  background: #fff;
+  flex-shrink: 0;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.sidebar-frame .spacer { flex: 1; }
+
+/* --- Sections --- */
+.sidebar-frame .section { margin-bottom: 24px; }
+.sidebar-frame .section:last-child { margin-bottom: 8px; }
+.sidebar-frame .section-title {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--rb-text-tertiary);
+  margin-bottom: 12px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--rb-border);
+}
+
+/* --- Form fields --- */
+.sidebar-frame .field { margin-bottom: 14px; }
+.sidebar-frame .field:last-child { margin-bottom: 0; }
+.sidebar-frame .field-label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--rb-text-secondary);
+  margin-bottom: 5px;
+}
+.sidebar-frame .field-hint {
+  font-size: 0.6875rem;
+  color: var(--rb-text-tertiary);
+  margin-top: 5px;
+  line-height: 1.45;
+}
+.sidebar-frame .field-input,
+.sidebar-frame .field-select {
+  width: 100%;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 7px 10px;
+  border: 1px solid var(--rb-border-input);
+  border-radius: 6px;
+  font-size: 0.8125rem;
+  font-family: inherit;
+  font-feature-settings: inherit;
+  outline: none;
+  background: #fff;
+  color: var(--rb-text);
+}
+.sidebar-frame .field-input::placeholder { color: var(--rb-text-placeholder); }
+.sidebar-frame .field-input:hover,
+.sidebar-frame .field-select:hover { border-color: var(--rb-border-hover); }
+.sidebar-frame .field-input:focus,
+.sidebar-frame .field-select:focus,
+.sidebar-frame .field-textarea:focus {
+  border-color: var(--rb-accent);
+  box-shadow: 0 0 0 2px var(--rb-accent-focus);
+}
+.sidebar-frame .field-input[type="number"] {
+  font-variant-numeric: tabular-nums;
+}
+.sidebar-frame .field-textarea {
+  width: 100%;
+  max-width: 100%;
+  padding: 7px 10px;
+  border: 1px solid var(--rb-border-input);
+  border-radius: 6px;
+  font-family: 'SF Mono', 'JetBrains Mono', 'Fira Code', 'Cascadia Code', Consolas, monospace;
+  font-size: 0.75rem;
+  min-height: 56px;
+  resize: vertical;
+  outline: none;
+  line-height: 1.5;
+  color: var(--rb-text);
+}
+.sidebar-frame .field-textarea::placeholder { color: var(--rb-text-placeholder); }
+.sidebar-frame .field-textarea:hover { border-color: var(--rb-border-hover); }
+.sidebar-frame .field-row {
+  display: flex;
+  gap: 8px;
+}
+.sidebar-frame .field-row .field { flex: 1; margin-bottom: 0; }
+
+/* --- Key-value lists --- */
+.sidebar-frame .kv-list { margin-top: 4px; }
+.sidebar-frame .kv-row {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 6px;
+  align-items: center;
+  min-width: 0;
+}
+.sidebar-frame .kv-row input {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 8px;
+  border: 1px solid var(--rb-border-input);
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-family: inherit;
+  font-feature-settings: inherit;
+  outline: none;
+  color: var(--rb-text);
+}
+.sidebar-frame .kv-row input::placeholder { color: var(--rb-text-placeholder); }
+.sidebar-frame .kv-row input:hover { border-color: var(--rb-border-hover); }
+.sidebar-frame .kv-row input:focus {
+  border-color: var(--rb-accent);
+  box-shadow: 0 0 0 2px var(--rb-accent-focus);
+}
+.sidebar-frame .kv-remove {
+  width: 26px; height: 26px;
+  border: none; background: transparent;
+  cursor: pointer; color: var(--rb-text-placeholder);
+  font-size: 15px; border-radius: 6px;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+  font-family: inherit;
+}
+.sidebar-frame .kv-remove:hover { background: rgba(220,38,38,0.06); color: var(--rb-danger); }
+.sidebar-frame .kv-remove:focus-visible { outline: 2px solid var(--rb-accent); outline-offset: 1px; }
+.sidebar-frame .kv-add {
+  font-size: 0.75rem; color: var(--rb-accent); cursor: pointer;
+  background: none; border: none; padding: 4px 0; font-weight: 500;
+  font-family: inherit;
+}
+.sidebar-frame .kv-add:hover { color: var(--rb-accent-hover); text-decoration: underline; }
+.sidebar-frame .kv-add:focus-visible { outline: 2px solid var(--rb-accent); outline-offset: 1px; }
+
+/* --- Buttons --- */
+.sidebar-frame .btn {
+  padding: 7px 12px; border-radius: 6px; font-size: 0.8125rem;
+  font-weight: 500; cursor: pointer; border: none;
+  display: inline-flex; align-items: center; gap: 4px;
+  font-family: inherit;
+  position: relative;
+}
+.sidebar-frame .btn:focus-visible {
+  outline: 2px solid var(--rb-accent);
+  outline-offset: 2px;
+}
+.sidebar-frame .btn:disabled { opacity: 0.4; cursor: not-allowed; pointer-events: none; }
+.sidebar-frame .btn-primary { background: var(--rb-accent); color: white; }
+.sidebar-frame .btn-primary:hover:not(:disabled) { background: var(--rb-accent-hover); }
+.sidebar-frame .btn-primary:active:not(:disabled) { background: var(--rb-accent-active); transform: scale(0.98); }
+.sidebar-frame .btn-secondary { background: #fff; color: var(--rb-text-secondary); border: 1px solid var(--rb-border-input); }
+.sidebar-frame .btn-secondary:hover:not(:disabled) { background: var(--rb-bg-hover); border-color: var(--rb-border-hover); }
+.sidebar-frame .btn-secondary:active:not(:disabled) { background: var(--rb-bg-active); }
+.sidebar-frame .btn-danger { background: #fff; color: var(--rb-danger); border: 1px solid var(--rb-border-input); }
+.sidebar-frame .btn-danger:hover:not(:disabled) { background: rgba(220,38,38,0.06); border-color: rgba(220,38,38,0.2); }
+.sidebar-frame .btn-danger:active:not(:disabled) { background: rgba(220,38,38,0.10); }
+.sidebar-frame .btn-icon {
+  background: transparent; border: none; cursor: pointer;
+  padding: 6px; border-radius: 6px; color: var(--rb-text-tertiary);
+  display: flex; align-items: center;
+  font-size: 16px;
+  font-family: inherit;
+}
+.sidebar-frame .btn-icon:hover { background: var(--rb-bg-hover); color: var(--rb-text); }
+.sidebar-frame .btn-icon:focus-visible { outline: 2px solid var(--rb-accent); outline-offset: 1px; }
+.sidebar-frame .btn-icon:active { transform: scale(0.92); }
+
+/* --- Badges --- */
+.sidebar-frame .badge {
+  display: inline-flex; align-items: center;
+  padding: 2px 7px; border-radius: 9999px;
+  font-size: 0.625rem; font-weight: 600;
+  letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums;
+}
+.sidebar-frame .badge-http      { background: #eff6ff; color: #1d4ed8; }
+.sidebar-frame .badge-waterfall { background: #f0fdf4; color: #15803d; }
+.sidebar-frame .badge-formula   { background: #fffbeb; color: #b45309; }
+.sidebar-frame .badge-exec      { background: #fef2f2; color: #dc2626; }
+.sidebar-frame .badge-ai        { background: #faf5ff; color: #7c3aed; }
+.sidebar-frame .badge-lookup    { background: #faf5ff; color: #7c3aed; }
+.sidebar-frame .badge-write     { background: #f0fdfa; color: #0d9488; }
+.sidebar-frame .badge-script    { background: #eef2ff; color: #4338ca; }
+
+.sidebar-frame .badge-src-http    { background: #eff6ff; color: #1d4ed8; }
+.sidebar-frame .badge-src-exec    { background: #fef2f2; color: #dc2626; }
+.sidebar-frame .badge-src-ai      { background: #faf5ff; color: #7c3aed; }
+.sidebar-frame .badge-src-webhook { background: #f0fdf4; color: #15803d; }
+.sidebar-frame .badge-src-script  { background: #eef2ff; color: #4338ca; }
+
+/* --- Action/Source list items --- */
+.sidebar-frame .action-item {
+  padding: 10px 12px;
+  border: 1px solid var(--rb-border);
+  border-radius: 8px;
+  margin-bottom: 8px;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.sidebar-frame .action-item:hover {
+  background: var(--rb-bg-hover);
+  border-color: var(--rb-border-input);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+}
+.sidebar-frame .action-item:active { transform: translateY(0); box-shadow: none; }
+.sidebar-frame .action-item:last-child { margin-bottom: 0; }
+.sidebar-frame .action-item-header {
+  display: flex; align-items: center; gap: 10px;
+}
+.sidebar-frame .action-item-title {
+  font-weight: 500; flex: 1; color: var(--rb-text);
+}
+.sidebar-frame .action-item-chevron {
+  color: rgba(0,0,0,0.15);
+  font-size: 14px;
+}
+.sidebar-frame .action-item:hover .action-item-chevron { color: var(--rb-text-tertiary); }
+
+/* --- Tab bar --- */
+.sidebar-frame .tab-bar { background: #fff; padding: 0 16px 0; }
+.sidebar-frame .tab-bar-inner {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--rb-border);
+}
+.sidebar-frame .tab-btn {
+  flex: 1;
+  padding: 10px 4px 10px;
+  border: none;
+  background: transparent;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--rb-text-tertiary);
+  cursor: pointer;
+  text-align: center;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  font-family: inherit;
+}
+.sidebar-frame .tab-btn:hover { color: var(--rb-text); }
+.sidebar-frame .tab-btn:focus-visible { outline: 2px solid var(--rb-accent); outline-offset: -2px; }
+.sidebar-frame .tab-btn.active {
+  color: var(--rb-accent);
+  border-bottom-color: var(--rb-accent);
+}
+
+/* --- Toggle (native checkbox, CSS-only state) --- */
+.sidebar-frame .toggle-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 0; margin-bottom: 4px;
+}
+.sidebar-frame .toggle-row-label {
+  font-size: 0.8125rem; color: var(--rb-text); font-weight: 500;
+}
+.sidebar-frame .toggle-row-sub {
+  font-size: 0.6875rem; color: var(--rb-text-tertiary); margin-top: 2px;
+}
+.sidebar-frame .toggle-wrapper {
+  position: relative;
+  display: inline-flex;
+  width: 40px;
+  height: 22px;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+.sidebar-frame .toggle-wrapper input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+  z-index: 1;
+  margin: 0;
+  width: 100%;
+  height: 100%;
+}
+.sidebar-frame .toggle-track {
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,0.15);
+  border-radius: 11px;
+  transition: background 0.2s ease;
+}
+.sidebar-frame .toggle-wrapper input:checked + .toggle-track {
+  background: var(--rb-success);
+}
+.sidebar-frame .toggle-knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  background: white;
+  border-radius: 50%;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.sidebar-frame .toggle-wrapper input:checked + .toggle-track .toggle-knob {
+  transform: translateX(18px);
+}
+.sidebar-frame .toggle-wrapper input:focus-visible + .toggle-track {
+  outline: 2px solid var(--rb-accent);
+  outline-offset: 2px;
+}
+
+/* --- Disabled banner --- */
+.sidebar-frame .disabled-banner {
+  background: #fffbeb; border: 1px solid rgba(245,158,11,0.25); border-radius: 8px;
+  padding: 10px 12px; margin-bottom: 16px; font-size: 0.75rem; color: #92400e;
+  display: flex; align-items: center; gap: 8px; line-height: 1.45;
+}
+.sidebar-frame .disabled-banner-icon {
+  flex-shrink: 0; font-size: 14px;
+}
+
+/* --- Empty state --- */
+.sidebar-frame .empty-state {
+  text-align: center; padding: 48px 24px; color: var(--rb-text-tertiary);
+}
+.sidebar-frame .empty-state-icon {
+  font-size: 36px; margin-bottom: 12px; opacity: 0.3;
+}
+.sidebar-frame .empty-state-title {
+  font-size: 0.875rem; font-weight: 600; color: var(--rb-text); margin-bottom: 6px;
+}
+.sidebar-frame .empty-state p {
+  font-size: 0.8125rem; color: var(--rb-text-tertiary); line-height: 1.5; max-width: 280px; margin: 0 auto;
+}
+
+/* --- Toast --- */
+.sidebar-frame .toast {
+  position: absolute; bottom: 60px; left: 16px; right: 16px;
+  padding: 10px 16px; border-radius: 8px; font-size: 0.8125rem; font-weight: 500;
+  z-index: 100; animation: rbFadeIn 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  color: white;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+}
+.sidebar-frame .toast-success { background: #16a34a; }
+.sidebar-frame .toast-error { background: #dc2626; }
+@keyframes rbFadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* --- Provider card --- */
+.sidebar-frame .provider-card {
+  border: 1px solid var(--rb-border); border-radius: 8px;
+  margin-bottom: 10px; overflow: hidden;
+}
+.sidebar-frame .provider-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 12px; background: rgba(0,0,0,0.02); border-bottom: 1px solid var(--rb-border);
+  font-size: 0.75rem; font-weight: 500; color: var(--rb-text-secondary);
+}
+.sidebar-frame .provider-body { padding: 12px; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   PROMPT OUTPUT
+   ═══════════════════════════════════════════════════════════════════════════ */
+.prompt-area {
+  max-width: 1312px;
+  margin: 0 auto;
+  padding: 0 40px 40px;
+}
+.prompt-box {
+  background: var(--shell-surface);
+  border: 1px solid var(--shell-border);
+  border-radius: 8px;
+  padding: 16px 20px;
+}
+.prompt-box-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+.prompt-box-header span {
+  font-size: 0.625rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: var(--shell-muted);
+}
+.copy-btn {
+  padding: 5px 12px;
+  background: transparent;
+  border: 1px solid var(--shell-border);
+  border-radius: 6px;
+  color: var(--shell-text);
+  font-size: 0.75rem;
+  cursor: pointer;
+  font-family: inherit;
+}
+.copy-btn:hover { background: #27272a; border-color: #3f3f46; }
+.prompt-text {
+  font-family: 'SF Mono', 'JetBrains Mono', 'Fira Code', 'Cascadia Code', Consolas, monospace;
+  font-size: 0.6875rem;
+  line-height: 1.7;
+  color: #71717a;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   V1 (CURRENT / BEFORE) OVERRIDES
+   Restores the original Google Material-ish design when body has class "v1"
+   ═══════════════════════════════════════════════════════════════════════════ */
+body.v1 {
+  --shell-bg: #0c0c0c;
+  --shell-surface: #161616;
+  --shell-text: #b0b0b0;
+  --shell-muted: #666;
+  --shell-border: #262626;
+  --shell-accent: #1a73e8;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-feature-settings: normal;
+  -webkit-font-smoothing: auto;
+  -moz-osx-font-smoothing: auto;
+}
+body.v1 .playground-header h1 { font-size: 16px; color: #e0e0e0; letter-spacing: -0.2px; }
+body.v1 .playground-header span { font-size: 12px; }
+body.v1 .panel-label {
+  font-size: 10px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 1.2px;
+}
+
+/* Sidebar frame tokens + structural */
+body.v1 .sidebar-frame {
+  --rb-text: #1a1a1a;
+  --rb-text-secondary: #3c4043;
+  --rb-text-tertiary: #5f6368;
+  --rb-text-placeholder: #9aa0a6;
+  --rb-border: #e8eaed;
+  --rb-border-input: #dadce0;
+  --rb-border-hover: #bdc1c6;
+  --rb-bg-hover: #f8f9fa;
+  --rb-bg-active: #f1f3f4;
+  --rb-accent: #1a73e8;
+  --rb-accent-hover: #1557b0;
+  --rb-accent-active: #0d47a1;
+  --rb-accent-focus: rgba(26,115,232,0.15);
+  --rb-success: #188038;
+  --rb-danger: #c5221f;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-feature-settings: normal;
+  font-size: 13px;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 32px rgba(0,0,0,0.5);
+}
+
+/* Scrollbar */
+body.v1 .sidebar-frame .rb-scroll::-webkit-scrollbar { width: 6px; }
+body.v1 .sidebar-frame .rb-scroll::-webkit-scrollbar-thumb { background: #d0d0d0; border-radius: 3px; }
+body.v1 .sidebar-frame .rb-scroll::-webkit-scrollbar-thumb:hover { background: #b0b0b0; }
+
+/* Header */
+body.v1 .sidebar-frame .rb-header-title { font-size: 15px; letter-spacing: -0.2px; }
+
+/* Sheet selector */
+body.v1 .sidebar-frame .rb-sheet-selector-title {
+  font-size: 12px; text-transform: uppercase; letter-spacing: 0.4px;
+}
+body.v1 .sidebar-frame .rb-sync-btn { transition: all 0.15s; }
+
+/* Sections — uppercase titles */
+body.v1 .sidebar-frame .section-title {
+  font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;
+}
+
+/* Form fields — px sizes + color transitions */
+body.v1 .sidebar-frame .field-label { font-size: 12px; }
+body.v1 .sidebar-frame .field-hint { font-size: 11px; }
+body.v1 .sidebar-frame .field-input,
+body.v1 .sidebar-frame .field-select {
+  padding: 8px 10px; font-size: 13px;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+body.v1 .sidebar-frame .field-textarea {
+  padding: 8px 10px; font-size: 12px;
+  font-family: 'SFMono-Regular', 'Roboto Mono', Consolas, monospace;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+/* KV lists */
+body.v1 .sidebar-frame .kv-row input {
+  padding: 7px 8px; font-size: 12px;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+body.v1 .sidebar-frame .kv-remove { color: #80868b; transition: all 0.15s; }
+body.v1 .sidebar-frame .kv-remove:hover { background: #fce8e6; color: #d93025; }
+body.v1 .sidebar-frame .kv-add { transition: color 0.15s; }
+
+/* Buttons — wider padding + transitions */
+body.v1 .sidebar-frame .btn { padding: 8px 16px; font-size: 13px; transition: all 0.15s; }
+body.v1 .sidebar-frame .btn-danger:hover:not(:disabled) { background: #fce8e6; border-color: #f5c6c2; }
+body.v1 .sidebar-frame .btn-danger:active:not(:disabled) { background: #f8d7d5; }
+body.v1 .sidebar-frame .btn-icon { transition: all 0.15s; }
+
+/* Badges — rounded rect, uppercase */
+body.v1 .sidebar-frame .badge {
+  border-radius: 10px; font-size: 10px; padding: 2px 8px;
+  text-transform: uppercase; letter-spacing: 0.3px;
+}
+body.v1 .sidebar-frame .badge-http      { background: #e8f0fe; color: #1967d2; }
+body.v1 .sidebar-frame .badge-waterfall { background: #e6f4ea; color: #137333; }
+body.v1 .sidebar-frame .badge-formula   { background: #fef7e0; color: #b06000; }
+body.v1 .sidebar-frame .badge-exec      { background: #fce8e6; color: #c5221f; }
+body.v1 .sidebar-frame .badge-ai        { background: #f3e8fd; color: #6a1fb5; }
+body.v1 .sidebar-frame .badge-lookup    { background: #f3e8fd; color: #6a1fb5; }
+body.v1 .sidebar-frame .badge-write     { background: #e0f7fa; color: #00695c; }
+body.v1 .sidebar-frame .badge-script    { background: #e8eaf6; color: #2e3aa1; }
+body.v1 .sidebar-frame .badge-src-http    { background: #e8f0fe; color: #1967d2; }
+body.v1 .sidebar-frame .badge-src-exec    { background: #fce8e6; color: #c5221f; }
+body.v1 .sidebar-frame .badge-src-ai      { background: #f3e8fd; color: #6a1fb5; }
+body.v1 .sidebar-frame .badge-src-webhook { background: #e6f4ea; color: #137333; }
+body.v1 .sidebar-frame .badge-src-script  { background: #e8eaf6; color: #2e3aa1; }
+
+/* Action items */
+body.v1 .sidebar-frame .action-item {
+  padding: 12px 14px; border-radius: 10px; transition: all 0.15s;
+}
+body.v1 .sidebar-frame .action-item:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+body.v1 .sidebar-frame .action-item-chevron { color: #bdc1c6; }
+
+/* Tabs */
+body.v1 .sidebar-frame .tab-btn { font-size: 12px; transition: color 0.15s, border-color 0.15s; }
+
+/* Toggle */
+body.v1 .sidebar-frame .toggle-track { background: #dadce0; }
+body.v1 .sidebar-frame .toggle-wrapper input:checked + .toggle-track { background: #188038; }
+body.v1 .sidebar-frame .toggle-knob { box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
+
+/* Disabled banner */
+body.v1 .sidebar-frame .disabled-banner { background: #fef7e0; border-color: #f9d67a; color: #b06000; }
+
+/* Toast */
+body.v1 .sidebar-frame .toast { box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+body.v1 .sidebar-frame .toast-success { background: #188038; }
+body.v1 .sidebar-frame .toast-error { background: #c5221f; }
+
+/* Provider card */
+body.v1 .sidebar-frame .provider-header { background: #f8f9fa; }
+
+/* Prompt area */
+body.v1 .prompt-box-header span { font-size: 10px; text-transform: uppercase; letter-spacing: 1.2px; }
+body.v1 .copy-btn:hover { background: #222; border-color: #444; }
+body.v1 .prompt-text { font-size: 11px; color: #888; }
+</style>
+</head>
+<body>
+
+<div class="playground-header">
+  <h1>Rowbound UI</h1>
+  <span>Google Sheets sidebar &mdash; 400px, vanilla JS</span>
+  <div class="version-toggle">
+    <button type="button" class="active" onclick="setVersion('v2')">After</button>
+    <button type="button" onclick="setVersion('v1')">Before</button>
+  </div>
+</div>
+
+<div class="panels">
+
+  <!-- ═══════════════ PANEL 1: OVERVIEW / ACTIONS LIST ═══════════════ -->
+  <div class="panel-wrapper">
+    <div class="panel-label">Overview</div>
+    <div class="sidebar-frame" id="panel-overview">
+      <div class="rb-scroll">
+        <div class="rb-header">
+          <div class="rb-header-title">Rowbound</div>
+        </div>
+        <div class="rb-sheet-selector">
+          <div class="rb-sheet-selector-header">
+            <span class="rb-sheet-selector-title">Sheet</span>
+            <button type="button" class="rb-sync-btn" aria-label="Sync data">&#8635; Sync</button>
+          </div>
+          <select class="field-select" style="width:100%;font-weight:500" aria-label="Select sheet tab">
+            <option>Leads</option>
+            <option>Contacts</option>
+            <option>Companies</option>
+          </select>
+        </div>
+        <div class="tab-bar" id="overview-tab-bar">
+          <div class="tab-bar-inner">
+            <button type="button" class="tab-btn active" onclick="switchOverviewTab('actions')" role="tab" aria-selected="true">Actions</button>
+            <button type="button" class="tab-btn" onclick="switchOverviewTab('sources')" role="tab" aria-selected="false">Sources</button>
+            <button type="button" class="tab-btn" onclick="switchOverviewTab('settings')" role="tab" aria-selected="false">Settings</button>
+          </div>
+        </div>
+        <div class="rb-content" id="overview-content"></div>
+      </div>
+      <div class="rb-footer" id="overview-footer"></div>
+    </div>
+  </div>
+
+  <!-- ═══════════════ PANEL 2: SETTINGS ═══════════════ -->
+  <div class="panel-wrapper">
+    <div class="panel-label">Settings</div>
+    <div class="sidebar-frame" id="panel-settings">
+      <div class="rb-scroll">
+        <div class="rb-header">
+          <div class="rb-header-title">Rowbound</div>
+        </div>
+        <div class="rb-sheet-selector">
+          <div class="rb-sheet-selector-header">
+            <span class="rb-sheet-selector-title">Sheet</span>
+            <button type="button" class="rb-sync-btn" aria-label="Sync data">&#8635; Sync</button>
+          </div>
+          <select class="field-select" style="width:100%;font-weight:500" aria-label="Select sheet tab">
+            <option>Leads</option>
+          </select>
+        </div>
+        <div class="tab-bar">
+          <div class="tab-bar-inner">
+            <button type="button" class="tab-btn" role="tab" aria-selected="false">Actions</button>
+            <button type="button" class="tab-btn" role="tab" aria-selected="false">Sources</button>
+            <button type="button" class="tab-btn active" role="tab" aria-selected="true">Settings</button>
+          </div>
+        </div>
+        <div class="rb-content" id="settings-content"></div>
+      </div>
+      <div class="rb-footer" id="settings-footer"></div>
+    </div>
+  </div>
+
+  <!-- ═══════════════ PANEL 3: ACTION EDITOR ═══════════════ -->
+  <div class="panel-wrapper">
+    <div class="panel-label">Action Editor</div>
+    <div class="sidebar-frame" id="panel-editor">
+      <div class="rb-scroll">
+        <div class="rb-header">
+          <div class="rb-header-title">
+            <button type="button" class="btn-icon" aria-label="Go back" title="Back">&#8592;</button>
+            <span>Company Info</span>
+          </div>
+        </div>
+        <div class="rb-content" id="editor-content"></div>
+      </div>
+      <div class="rb-footer" id="editor-footer"></div>
+    </div>
+  </div>
+
+</div>
+
+<div class="prompt-area">
+  <div class="prompt-box">
+    <div class="prompt-box-header">
+      <span>Design Description</span>
+      <button type="button" class="copy-btn" onclick="copyPrompt()">Copy</button>
+    </div>
+    <div class="prompt-text" id="prompt-output"></div>
+  </div>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════════════════
+   STATE
+   ═══════════════════════════════════════════════════════════════════════════ */
+const state = {
+  overviewTab: 'actions',
+  tableEnabled: true,
+  version: 'v2',
+};
+
+const SAMPLE_ACTIONS = [
+  { type: 'http', target: 'Company Info' },
+  { type: 'waterfall', target: 'Email' },
+  { type: 'ai', target: 'Company Summary' },
+  { type: 'formula', target: 'Clean Domain' },
+  { type: 'exec', target: 'WHOIS Data' },
+  { type: 'write', target: 'Output' },
+  { type: 'script', target: 'Custom Score' },
+  { type: 'lookup', target: 'CRM Match' },
+];
+
+const SAMPLE_SOURCES = [
+  { type: 'http', name: 'Hunter API' },
+  { type: 'webhook', name: 'Inbound Leads' },
+  { type: 'exec', name: 'CSV Import' },
+  { type: 'ai', name: 'Research Agent' },
+];
+
+const TYPE_LABELS = {
+  http: 'HTTP', ai: 'AI', exec: 'Exec', webhook: 'Webhook',
+  script: 'Script', formula: 'Formula', waterfall: 'Waterfall',
+  lookup: 'Lookup', write: 'Write'
+};
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   HELPERS
+   ═══════════════════════════════════════════════════════════════════════════ */
+function esc(s) {
+  if (s === null || s === undefined) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function field(label, input, hint) {
+  let h = '<div class="field">';
+  h += '<label class="field-label">' + esc(label) + '</label>';
+  h += input;
+  if (hint) h += '<div class="field-hint">' + esc(hint) + '</div>';
+  h += '</div>';
+  return h;
+}
+
+function kvList(rows, kPlaceholder, vPlaceholder) {
+  let h = '<div class="kv-list">';
+  for (const [k, v] of rows) {
+    h += '<div class="kv-row">';
+    h += '<input value="' + esc(k) + '" placeholder="' + esc(kPlaceholder) + '" aria-label="' + esc(kPlaceholder) + '">';
+    h += '<input value="' + esc(v) + '" placeholder="' + esc(vPlaceholder) + '" aria-label="' + esc(vPlaceholder) + '">';
+    h += '<button type="button" class="kv-remove" aria-label="Remove row">&#215;</button>';
+    h += '</div>';
+  }
+  h += '<button type="button" class="kv-add">+ Add</button>';
+  h += '</div>';
+  return h;
+}
+
+function showToast(panel, msg, type) {
+  const frame = document.getElementById(panel);
+  const existing = frame.querySelector('.toast');
+  if (existing) existing.remove();
+  const el = document.createElement('div');
+  el.className = 'toast toast-' + (type || 'success');
+  el.textContent = msg;
+  el.setAttribute('role', 'alert');
+  frame.appendChild(el);
+  setTimeout(() => el.remove(), 2000);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   VERSION TOGGLE
+   ═══════════════════════════════════════════════════════════════════════════ */
+function setVersion(v) {
+  state.version = v;
+  document.body.classList.toggle('v1', v === 'v1');
+  document.querySelectorAll('.version-toggle button').forEach(btn => {
+    btn.classList.toggle('active', btn.textContent.toLowerCase().includes(v === 'v2' ? 'after' : 'before'));
+  });
+  updatePrompt();
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   PANEL 1: OVERVIEW
+   ═══════════════════════════════════════════════════════════════════════════ */
+function switchOverviewTab(tab) {
+  state.overviewTab = tab;
+  renderOverview();
+  updatePrompt();
+}
+
+function renderOverview() {
+  const content = document.getElementById('overview-content');
+  const footer = document.getElementById('overview-footer');
+  const tabBar = document.getElementById('overview-tab-bar');
+
+  const btns = tabBar.querySelectorAll('.tab-btn');
+  const tabs = ['actions', 'sources', 'settings'];
+  btns.forEach((btn, i) => {
+    btn.classList.toggle('active', tabs[i] === state.overviewTab);
+    btn.setAttribute('aria-selected', tabs[i] === state.overviewTab ? 'true' : 'false');
+  });
+
+  if (state.overviewTab === 'actions') {
+    let h = '';
+    for (const action of SAMPLE_ACTIONS) {
+      h += '<div class="action-item" tabindex="0" role="button">';
+      h += '<div class="action-item-header">';
+      h += '<span class="badge badge-' + esc(action.type) + '">' + esc(TYPE_LABELS[action.type]) + '</span>';
+      h += '<span class="action-item-title">' + esc(action.target) + '</span>';
+      h += '<span class="action-item-chevron">&#8250;</span>';
+      h += '</div>';
+      h += '</div>';
+    }
+    content.innerHTML = h;
+    footer.innerHTML = '<span class="spacer"></span><button type="button" class="btn btn-primary">New Action</button>';
+  }
+  else if (state.overviewTab === 'sources') {
+    let h = '';
+    for (const src of SAMPLE_SOURCES) {
+      h += '<div class="action-item" tabindex="0" role="button">';
+      h += '<div class="action-item-header">';
+      h += '<span class="badge badge-src-' + esc(src.type) + '">' + esc(TYPE_LABELS[src.type]) + '</span>';
+      h += '<span class="action-item-title">' + esc(src.name) + '</span>';
+      h += '<span class="action-item-chevron">&#8250;</span>';
+      h += '</div>';
+      h += '</div>';
+    }
+    content.innerHTML = h;
+    footer.innerHTML = '<span class="spacer"></span><button type="button" class="btn btn-primary">New Source</button>';
+  }
+  else if (state.overviewTab === 'settings') {
+    renderOverviewSettings(content, footer);
+  }
+}
+
+function renderOverviewSettings(content, footer) {
+  const enabled = state.tableEnabled;
+  let h = '<div class="section"><div class="section-title">Execution</div>';
+  h += '<div class="toggle-row">';
+  h += '<div><span class="toggle-row-label">' + (enabled ? 'Table enabled' : 'Table disabled') + '</span>';
+  h += '<div class="toggle-row-sub">Actions will ' + (enabled ? 'run automatically' : 'not run') + '</div></div>';
+  h += '<label class="toggle-wrapper">';
+  h += '<input type="checkbox" id="overview-toggle" ' + (enabled ? 'checked' : '') + ' aria-label="Toggle table processing">';
+  h += '<span class="toggle-track"><span class="toggle-knob"></span></span>';
+  h += '</label>';
+  h += '</div>';
+  h += field('Concurrency', '<input class="field-input" type="number" min="1" value="1" aria-label="Concurrency">', 'Rows processed in parallel');
+  h += field('Rate Limit', '<input class="field-input" type="number" min="0" step="0.1" value="5" aria-label="Rate limit">', 'Seconds between requests');
+  h += '</div>';
+
+  h += '<div class="section"><div class="section-title">Retries</div>';
+  h += field('Retry Attempts', '<input class="field-input" type="number" min="0" value="2" aria-label="Retry attempts">');
+  h += field('Backoff Strategy', '<select class="field-select" aria-label="Backoff strategy"><option selected>exponential</option><option>linear</option><option>fixed</option></select>');
+  h += '</div>';
+
+  content.innerHTML = h;
+  footer.innerHTML = '<span class="spacer"></span><button type="button" class="btn btn-primary" onclick="showToast(\'panel-overview\',\'Settings saved\')">Save</button>';
+
+  const toggle = document.getElementById('overview-toggle');
+  if (toggle) {
+    toggle.onchange = function() {
+      state.tableEnabled = this.checked;
+      renderOverview();
+      updatePrompt();
+    };
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   PANEL 2: SETTINGS
+   ═══════════════════════════════════════════════════════════════════════════ */
+function renderSettings() {
+  const content = document.getElementById('settings-content');
+  const footer = document.getElementById('settings-footer');
+
+  let h = '<div class="section"><div class="section-title">Execution</div>';
+  h += '<div class="toggle-row">';
+  h += '<div><span class="toggle-row-label">Table enabled</span>';
+  h += '<div class="toggle-row-sub">Actions will run automatically</div></div>';
+  h += '<label class="toggle-wrapper">';
+  h += '<input type="checkbox" id="settings-toggle" checked aria-label="Toggle table processing">';
+  h += '<span class="toggle-track"><span class="toggle-knob"></span></span>';
+  h += '</label>';
+  h += '</div>';
+  h += field('Concurrency', '<input class="field-input" type="number" min="1" value="1" aria-label="Concurrency">', 'Rows processed in parallel');
+  h += field('Rate Limit', '<input class="field-input" type="number" min="0" step="0.1" value="5" aria-label="Rate limit">', 'Seconds between requests (e.g. 1 = one per second)');
+  h += '</div>';
+
+  h += '<div class="section"><div class="section-title">Retries</div>';
+  h += field('Retry Attempts', '<input class="field-input" type="number" min="0" value="2" aria-label="Retry attempts">');
+  h += field('Backoff Strategy', '<select class="field-select" aria-label="Backoff strategy"><option selected>exponential</option><option>linear</option><option>fixed</option></select>');
+  h += '</div>';
+
+  content.innerHTML = h;
+  footer.innerHTML = '<span class="spacer"></span><button type="button" class="btn btn-primary" onclick="showToast(\'panel-settings\',\'Settings saved\')">Save</button>';
+
+  const toggle = document.getElementById('settings-toggle');
+  if (toggle) {
+    toggle.onchange = function() {
+      const isOn = this.checked;
+      const row = this.closest('.toggle-row');
+      const label = row.querySelector('.toggle-row-label');
+      const sub = row.querySelector('.toggle-row-sub');
+      label.textContent = isOn ? 'Table enabled' : 'Table disabled';
+      sub.textContent = isOn ? 'Actions will run automatically' : 'Actions will not run';
+    };
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   PANEL 3: ACTION EDITOR
+   ═══════════════════════════════════════════════════════════════════════════ */
+function renderEditor() {
+  const content = document.getElementById('editor-content');
+  const footer = document.getElementById('editor-footer');
+
+  let h = '';
+
+  h += '<div class="section"><div class="section-title">Action</div>';
+  h += field('Column',
+    '<select class="field-select" aria-label="Target column">' +
+    '<option selected>Company Info</option>' +
+    '<option>Email</option>' +
+    '<option>Clean Domain</option>' +
+    '<option>WHOIS Data</option>' +
+    '</select>',
+    'Only columns without an action are available.');
+  h += field('Type',
+    '<select class="field-select" aria-label="Action type">' +
+    '<option value="http" selected>HTTP</option>' +
+    '<option value="ai">AI</option>' +
+    '<option value="formula">Formula</option>' +
+    '<option value="waterfall">Waterfall</option>' +
+    '<option value="exec">Exec</option>' +
+    '<option value="lookup">Lookup</option>' +
+    '<option value="write">Write</option>' +
+    '<option value="script">Script</option>' +
+    '</select>');
+  h += '</div>';
+
+  h += '<div class="section"><div class="section-title">Request</div>';
+  h += '<div class="field-row">';
+  h += '<div class="field"><label class="field-label">Method</label>';
+  h += '<select class="field-select" aria-label="HTTP method"><option selected>GET</option><option>POST</option><option>PUT</option><option>PATCH</option><option>DELETE</option></select></div>';
+  h += '</div>';
+  h += field('URL',
+    '<input class="field-input" value="https://api.example.com/company/{{domain}}" placeholder="https://api.example.com/{{domain}}" aria-label="Request URL">',
+    'Supports {{column}} and {{env.VAR}} templates');
+  h += '</div>';
+
+  h += '<div class="section"><div class="section-title">Headers</div>';
+  h += kvList([
+    ['Authorization', 'Bearer {{env.API_KEY}}'],
+    ['Content-Type', 'application/json'],
+  ], 'Header', 'Value');
+  h += '</div>';
+
+  h += '<div class="section"><div class="section-title">Body</div>';
+  h += field('Request Body',
+    '<textarea class="field-textarea" placeholder="JSON body (optional)" aria-label="Request body"></textarea>',
+    'JSON format. Supports templates.');
+  h += '</div>';
+
+  h += '<div class="section"><div class="section-title">Response</div>';
+  h += field('Extract (JSONPath)',
+    '<input class="field-input" value="$.data.company.name" placeholder="$.data.name" aria-label="JSONPath extract">',
+    'JSONPath expression to extract value from response');
+  h += field('If empty, write',
+    '<input class="field-input" value="" placeholder="e.g. \u274c" aria-label="Fallback value">',
+    'Value to write when the extract returns nothing.');
+  h += '</div>';
+
+  h += '<div class="section"><div class="section-title">Error Handling</div>';
+  h += kvList([
+    ['404', 'skip'],
+    ['500', '{"write":"N/A"}'],
+  ], 'e.g. 404', 'e.g. skip or {"write":"N/A"}');
+  h += '</div>';
+
+  h += '<div class="section"><div class="section-title">Environment Variables</div>';
+  h += '<p class="field-hint" style="margin-bottom:8px">Per-action overrides merged into this action\'s environment.</p>';
+  h += kvList([
+    ['API_KEY', 'sk-abc123'],
+  ], 'e.g. API_KEY', 'e.g. sk-abc123');
+  h += '</div>';
+
+  h += '<div class="section"><div class="section-title">Run Conditions</div>';
+  h += field('Only run if',
+    '<textarea class="field-textarea" placeholder="e.g. {{domain}} !== \'\'" aria-label="Run condition">{{domain}} !== \'\'</textarea>',
+    'JavaScript expression. Use {{column}} for cell values.');
+  h += '</div>';
+
+  content.innerHTML = h;
+  footer.innerHTML =
+    '<button type="button" class="btn btn-danger" onclick="showToast(\'panel-editor\',\'Action deleted\',\'error\')">Delete</button>' +
+    '<span class="spacer"></span>' +
+    '<button type="button" class="btn btn-secondary">Cancel</button>' +
+    '<button type="button" class="btn btn-primary" onclick="showToast(\'panel-editor\',\'Action saved\')">Save</button>';
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   PROMPT OUTPUT
+   ═══════════════════════════════════════════════════════════════════════════ */
+function updatePrompt() {
+  const el = document.getElementById('prompt-output');
+  const v = state.version;
+
+  let text;
+  if (v === 'v1') {
+    text = `Rowbound sidebar — Google Sheets sidebar at 400px fixed width.
+
+Design (v1 — current):
+
+  Typography
+  - System font stack (-apple-system, BlinkMacSystemFont, Segoe UI, Roboto)
+  - Font sizes in px (10px–16px)
+  - Section titles and badges use UPPERCASE with letter-spacing
+  - Default browser font smoothing
+
+  Colors & Borders
+  - Google Material palette: accent #1a73e8, text #1a1a1a/#3c4043/#5f6368
+  - Solid hex border colors: #e8eaed dividers, #dadce0 inputs
+  - Badge colors from Material palette (e.g. #1967d2, #137333, #6a1fb5)
+
+  Interactions
+  - transition: all 0.15s on buttons, inputs, action items
+  - Color and background transitions on hover states
+  - Toggle uses button + JS class toggling (.on)
+
+  Components
+  - Buttons: 8px 16px padding
+  - Badges: border-radius 10px, uppercase text
+  - Action items: 12px 14px padding, border-radius 10px
+  - Scrollbar: 6px width, solid #d0d0d0
+  - Sidebar shadow: strong (0.3/0.5 alpha)
+
+Currently viewing: ${state.overviewTab} tab, table ${state.tableEnabled ? 'enabled' : 'disabled'}.`;
+  } else {
+    text = `Rowbound sidebar — Google Sheets sidebar at 400px fixed width.
+
+Design (v2 — redesigned):
+
+  Typography
+  - InterVariable from rsms.me with OpenType features (cv02, cv03, cv04, cv11)
+  - Antialiased rendering (-webkit-font-smoothing, -moz-osx-font-smoothing)
+  - Font sizes in rem for consistency (0.625rem–0.9375rem scale)
+  - Section titles use sentence case, not uppercase
+  - tabular-nums on number inputs to prevent layout shift
+
+  Colors & Borders
+  - Text hierarchy: #111827 primary, #374151 secondary, #6b7280 tertiary
+  - All borders use rgba (0.07–0.20 opacity) instead of solid hex
+  - Accent blue: #2563eb with hover #1d4ed8, focus ring rgba(37,99,235,0.18)
+  - Badge colors use refined Tailwind palette values
+  - Zinc palette for playground shell (09090b–a1a1aa)
+  - Provider card backgrounds use rgba(0,0,0,0.02) instead of solid gray
+
+  Interactions
+  - Transitions only on transform/opacity/box-shadow, never on color/background
+  - Native checkbox toggles with CSS :checked state (no JS class toggling)
+  - Focus-visible with 2px outline + offset on all interactive elements
+  - Action items lift on hover via transform translateY(-1px)
+
+  Components
+  - Buttons: 7px 12px padding (less horizontal), type="button" on all
+  - Badges: border-radius 9999px (true pill), refined proportions
+  - Toggle: native input[type=checkbox] + CSS-only visual state
+  - Scrollbar: 5px width, rgba-based colors, 9999px radius
+  - Toast: refined shadow (0 4px 16px rgba)
+
+  Accessibility
+  - ARIA labels on all inputs, toggles, icon buttons
+  - role="tab" + aria-selected on tab buttons
+  - Native checkbox for toggles (inherent accessibility)
+  - role="button" + tabindex on action items
+  - role="alert" on toast notifications
+  - focus-visible outlines on all interactive elements
+
+Currently viewing: ${state.overviewTab} tab, table ${state.tableEnabled ? 'enabled' : 'disabled'}.`;
+  }
+
+  el.textContent = text;
+}
+
+function copyPrompt() {
+  const text = document.getElementById('prompt-output').textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = document.querySelector('.copy-btn');
+    btn.textContent = 'Copied!';
+    setTimeout(() => btn.textContent = 'Copy', 1500);
+  });
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   INIT
+   ═══════════════════════════════════════════════════════════════════════════ */
+renderOverview();
+renderSettings();
+renderEditor();
+updatePrompt();
+</script>
+</body>
+</html>
