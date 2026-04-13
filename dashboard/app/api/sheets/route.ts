@@ -2,12 +2,108 @@ import { NextRequest, NextResponse } from "next/server";
 
 /**
  * GET /api/sheets?id=SPREADSHEET_ID&sheet=Sheet1
+ * Reads rows from a Google Sheet.
  *
- * Reads rows from a Google Sheet via the Sheets API.
- * Uses a service account for auth (GOOGLE_SERVICE_ACCOUNT_KEY env var).
- *
- * For now, returns a placeholder until Google Sheets API is configured.
+ * POST /api/sheets
+ * Creates a new Google Sheet from CSV data.
+ * Body: { title: string, headers: string[], rows: Record<string, string>[] }
+ * Returns: { spreadsheetId: string, url: string }
  */
+
+export async function POST(request: NextRequest) {
+  const serviceAccountKey = process.env.GOOGLE_SERVICE_ACCOUNT_KEY;
+  if (!serviceAccountKey) {
+    return NextResponse.json(
+      { error: "Google Sheets not configured. Set GOOGLE_SERVICE_ACCOUNT_KEY in .env.local" },
+      { status: 503 },
+    );
+  }
+
+  try {
+    const body = await request.json();
+    const { title, headers, rows } = body as {
+      title: string;
+      headers: string[];
+      rows: Record<string, string>[];
+    };
+
+    if (!title || !headers?.length || !rows?.length) {
+      return NextResponse.json(
+        { error: "Missing title, headers, or rows" },
+        { status: 400 },
+      );
+    }
+
+    const credentials = JSON.parse(serviceAccountKey);
+    const token = await getAccessToken(credentials);
+
+    // 1. Create a new spreadsheet
+    const createRes = await fetch(
+      "https://sheets.googleapis.com/v4/spreadsheets",
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          properties: { title },
+          sheets: [{ properties: { title: "Sheet1" } }],
+        }),
+      },
+    );
+
+    if (!createRes.ok) {
+      const err = await createRes.text();
+      return NextResponse.json(
+        { error: `Failed to create spreadsheet: ${createRes.status}`, details: err },
+        { status: createRes.status },
+      );
+    }
+
+    const spreadsheet = await createRes.json();
+    const spreadsheetId = spreadsheet.spreadsheetId;
+
+    // 2. Write headers + rows as values
+    const values: string[][] = [headers];
+    for (const row of rows) {
+      values.push(headers.map((h) => row[h] ?? ""));
+    }
+
+    const writeRes = await fetch(
+      `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/Sheet1!A1?valueInputOption=USER_ENTERED`,
+      {
+        method: "PUT",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ range: "Sheet1!A1", values }),
+      },
+    );
+
+    if (!writeRes.ok) {
+      const err = await writeRes.text();
+      return NextResponse.json(
+        { error: `Failed to write data: ${writeRes.status}`, details: err },
+        { status: writeRes.status },
+      );
+    }
+
+    return NextResponse.json({
+      spreadsheetId,
+      url: `https://docs.google.com/spreadsheets/d/${spreadsheetId}`,
+      rowCount: rows.length,
+      columnCount: headers.length,
+    });
+  } catch (err) {
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : "Failed to create sheet" },
+      { status: 500 },
+    );
+  }
+}
+
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const spreadsheetId = searchParams.get("id");
@@ -90,7 +186,7 @@ async function getAccessToken(credentials: {
   const header = { alg: "RS256", typ: "JWT" };
   const payload = {
     iss: credentials.client_email,
-    scope: "https://www.googleapis.com/auth/spreadsheets.readonly",
+    scope: "https://www.googleapis.com/auth/spreadsheets",
     aud: "https://oauth2.googleapis.com/token",
     iat: now,
     exp: now + 3600,

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import Papa from "papaparse";
 import { Header } from "@/components/layout/header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -20,6 +21,8 @@ import {
   FileSpreadsheet,
   Table2,
   X,
+  Loader2,
+  Play,
 } from "lucide-react";
 
 const SKILLS = [
@@ -110,6 +113,9 @@ export default function EnrichPage() {
   const [dragOver, setDragOver] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [selectedSkill, setSelectedSkill] = useState<string | null>(null);
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
+  const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const filteredSkills =
@@ -164,6 +170,56 @@ export default function EnrichPage() {
     setCsvData(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
   }
+
+  async function handleRun() {
+    if (!csvData || !selectedSkill) return;
+
+    setCreating(true);
+    setCreateError(null);
+
+    try {
+      // Create a Google Sheet from the CSV data
+      const skillName = SKILLS.find((s) => s.id === selectedSkill)?.name ?? selectedSkill;
+      const title = `${csvData.fileName.replace(/\.csv$/i, "")} — ${skillName}`;
+
+      const res = await fetch("/api/sheets", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title,
+          headers: csvData.headers,
+          rows: csvData.rows,
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || `Failed to create sheet: ${res.status}`);
+      }
+
+      const result = await res.json();
+      const spreadsheetId = result.spreadsheetId;
+
+      // Save to connected sheets in localStorage
+      const saved = localStorage.getItem("clay-sheets");
+      const sheets = saved ? JSON.parse(saved) : [];
+      sheets.unshift({
+        id: spreadsheetId,
+        title,
+        rowCount: csvData.rows.length,
+        lastRun: new Date().toLocaleDateString(),
+      });
+      localStorage.setItem("clay-sheets", JSON.stringify(sheets));
+
+      // Navigate to table view
+      router.push(`/tables/${spreadsheetId}`);
+    } catch (err) {
+      setCreateError(err instanceof Error ? err.message : "Something went wrong");
+      setCreating(false);
+    }
+  }
+
+  const canRun = dataSource === "csv" && csvData && selectedSkill;
 
   return (
     <>
@@ -403,6 +459,59 @@ export default function EnrichPage() {
               </div>
             </CardContent>
           </Card>
+
+          {/* Step 3: Run */}
+          {dataSource === "csv" && (
+            <Card
+              className={
+                canRun
+                  ? "border-primary/30 bg-primary/5"
+                  : "opacity-60"
+              }
+            >
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <Badge variant="secondary" className="text-xs">
+                      3
+                    </Badge>
+                    <div>
+                      <h3 className="text-sm font-medium">
+                        {canRun
+                          ? `Run ${SKILLS.find((s) => s.id === selectedSkill)?.name} on ${csvData?.rows.length} rows`
+                          : "Upload data and choose an enrichment to continue"}
+                      </h3>
+                      {canRun && (
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          Creates a Google Sheet from your CSV, then enriches it
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  <Button
+                    onClick={handleRun}
+                    disabled={!canRun || creating}
+                    size="lg"
+                  >
+                    {creating ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Creating sheet...
+                      </>
+                    ) : (
+                      <>
+                        <Play className="w-4 h-4 mr-2" />
+                        Run Enrichment
+                      </>
+                    )}
+                  </Button>
+                </div>
+                {createError && (
+                  <p className="text-sm text-destructive mt-3">{createError}</p>
+                )}
+              </CardContent>
+            </Card>
+          )}
         </div>
       </div>
     </>
