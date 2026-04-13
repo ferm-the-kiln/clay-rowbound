@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>com.clay.rowbound-watch</string>
+
+	<key>ProgramArguments</key>
+	<array>
+		<string>ROWBOUND_BIN</string>
+		<string>watch</string>
+		<string>SHEET_ID</string>
+		<string>--port</string>
+		<string>3000</string>
+	</array>
+
+	<key>RunAtLoad</key>
+	<true/>
+
+	<key>KeepAlive</key>
+	<true/>
+
+	<key>StandardOutPath</key>
+	<string>/tmp/rowbound-watch.log</string>
+
+	<key>StandardErrorPath</key>
+	<string>/tmp/rowbound-watch-error.log</string>
+
+	<key>EnvironmentVariables</key>
+	<dict>
+		<key>PATH</key>
+		<string>/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin</string>
+	</dict>
+</dict>
+</plist>
