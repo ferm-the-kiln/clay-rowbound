@@ -2,10 +2,18 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Header } from "@/components/layout/header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Table2, Sparkles, Plus } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import {
+  Table2,
+  Sparkles,
+  Plus,
+  Play,
+  Clock,
+} from "lucide-react";
 
 interface ConnectedSheet {
   id: string;
@@ -14,19 +22,49 @@ interface ConnectedSheet {
   rowCount?: number;
 }
 
+interface RecentEnrichment {
+  spreadsheetId: string;
+  skillId: string;
+  skillName: string;
+  rowCount: number;
+  timestamp: string;
+}
+
 export default function HomePage() {
   const [sheets, setSheets] = useState<ConnectedSheet[]>([]);
+  const [recentEnrichments, setRecentEnrichments] = useState<RecentEnrichment[]>([]);
+  const router = useRouter();
 
   useEffect(() => {
-    const saved = localStorage.getItem("clay-sheets");
-    if (saved) {
+    const savedSheets = localStorage.getItem("clay-sheets");
+    if (savedSheets) {
       try {
-        setSheets(JSON.parse(saved));
+        setSheets(JSON.parse(savedSheets));
+      } catch {
+        // ignore
+      }
+    }
+
+    const savedRecent = localStorage.getItem("clay-recent-enrichments");
+    if (savedRecent) {
+      try {
+        setRecentEnrichments(JSON.parse(savedRecent));
       } catch {
         // ignore
       }
     }
   }, []);
+
+  function formatTimeAgo(iso: string): string {
+    const diff = Date.now() - new Date(iso).getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return "Just now";
+    if (mins < 60) return `${mins}m ago`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return `${hrs}h ago`;
+    const days = Math.floor(hrs / 24);
+    return `${days}d ago`;
+  }
 
   return (
     <>
@@ -68,6 +106,55 @@ export default function HomePage() {
               </Card>
             </Link>
           </div>
+
+          {/* Recent Enrichments */}
+          {recentEnrichments.length > 0 && (
+            <Card>
+              <CardHeader>
+                <div className="flex items-center gap-2">
+                  <Clock className="w-4 h-4 text-muted-foreground" />
+                  <CardTitle className="text-lg">Recent Enrichments</CardTitle>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  {recentEnrichments.slice(0, 5).map((enrichment, i) => (
+                    <div
+                      key={`${enrichment.spreadsheetId}-${enrichment.timestamp}-${i}`}
+                      className="flex items-center justify-between rounded-md border border-border p-3 hover:bg-muted/30 transition-colors"
+                    >
+                      <div className="flex items-center gap-3">
+                        <Sparkles className="w-4 h-4 text-muted-foreground" />
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <p className="text-sm font-medium">
+                              {enrichment.skillName}
+                            </p>
+                            <Badge variant="outline" className="text-[10px]">
+                              {enrichment.rowCount} rows
+                            </Badge>
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            {formatTimeAgo(enrichment.timestamp)}
+                          </p>
+                        </div>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() =>
+                          router.push(`/tables/${enrichment.spreadsheetId}`)
+                        }
+                      >
+                        <Play className="w-3 h-3 mr-1" />
+                        Run again
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Connected Sheets */}
           <Card>

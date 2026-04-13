@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Sidebar } from "@/components/layout/sidebar";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { Toaster } from "sonner";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -36,6 +37,13 @@ export default function RootLayout({
             {children}
           </main>
         </TooltipProvider>
+        <Toaster
+          position="bottom-right"
+          theme="dark"
+          toastOptions={{
+            style: { background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", color: "hsl(var(--foreground))" },
+          }}
+        />
       </body>
     </html>
   );

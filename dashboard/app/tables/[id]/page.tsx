@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
+import { toast } from "sonner";
 import { Header } from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -19,6 +20,9 @@ import {
   Loader2,
   ChevronDown,
   ExternalLink,
+  Download,
+  Copy,
+  Check,
 } from "lucide-react";
 import { fetchSheetRows, triggerEnrichment, checkHealth } from "@/lib/api";
 import type { SheetRow } from "@/lib/types";
@@ -41,6 +45,12 @@ const SKILL_CATEGORIES = {
   ],
 };
 
+const ALL_SKILLS = [
+  ...SKILL_CATEGORIES.research,
+  ...SKILL_CATEGORIES.content,
+  ...SKILL_CATEGORIES.data,
+];
+
 export default function TableViewPage() {
   const params = useParams();
   const spreadsheetId = params.id as string;
@@ -49,6 +59,7 @@ export default function TableViewPage() {
   const [headers, setHeaders] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [running, setRunning] = useState(false);
+  const [runningSkill, setRunningSkill] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
@@ -81,23 +92,55 @@ export default function TableViewPage() {
   async function handleRunSkill(skillId: string) {
     const connected = await checkHealth();
     if (!connected) {
-      setError("Rowbound is not running. Start it first.");
+      toast.error("Rowbound is not running. Start it first.");
       return;
     }
 
+    const skillName = ALL_SKILLS.find((s) => s.id === skillId)?.label ?? skillId;
+
     try {
       setRunning(true);
+      setRunningSkill(skillId);
       setError(null);
+      toast.info(`Running ${skillName} on ${rows.length} rows...`);
+
+      // Save to recent enrichments
+      saveRecentEnrichment(spreadsheetId, skillId, skillName, rows.length);
+
       await triggerEnrichment(spreadsheetId, skillId);
       // Poll for a bit then stop
       setTimeout(() => {
         setRunning(false);
+        setRunningSkill(null);
         loadData();
+        toast.success(`${skillName} complete!`);
       }, 10000);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Enrichment failed");
+      const msg = err instanceof Error ? err.message : "Enrichment failed";
+      toast.error(msg);
+      setError(msg);
       setRunning(false);
+      setRunningSkill(null);
     }
+  }
+
+  // --- CSV Export ---
+  function handleExportCsv() {
+    if (rows.length === 0 || headers.length === 0) return;
+
+    const csvContent = [
+      headers.map(escCsv).join(","),
+      ...rows.map((row) => headers.map((h) => escCsv(row[h] ?? "")).join(",")),
+    ].join("\n");
+
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `enrichment-${spreadsheetId.slice(0, 8)}-${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+    toast.success(`Exported ${rows.length} rows as CSV`);
   }
 
   return (
@@ -158,11 +201,23 @@ export default function TableViewPage() {
               </DropdownMenuContent>
             </DropdownMenu>
 
+            {/* Export CSV */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleExportCsv}
+              disabled={rows.length === 0}
+              title="Export as CSV"
+            >
+              <Download className="w-4 h-4" />
+            </Button>
+
             <Button
               variant="outline"
               size="sm"
               onClick={loadData}
               disabled={loading}
+              title="Refresh data"
             >
               <RefreshCw
                 className={`w-4 h-4 ${loading ? "animate-spin" : ""}`}
@@ -174,7 +229,7 @@ export default function TableViewPage() {
               target="_blank"
               rel="noopener noreferrer"
             >
-              <Button variant="outline" size="sm">
+              <Button variant="outline" size="sm" title="Open in Google Sheets">
                 <ExternalLink className="w-4 h-4" />
               </Button>
             </a>
@@ -183,11 +238,11 @@ export default function TableViewPage() {
       />
 
       {/* Status bar */}
-      {running && (
+      {running && runningSkill && (
         <div className="shrink-0 border-b border-border bg-primary/5 px-6 py-2 flex items-center gap-2">
           <Loader2 className="w-3 h-3 animate-spin text-primary" />
           <span className="text-sm text-muted-foreground">
-            Enrichment running... Results will appear as cells update.
+            Running {ALL_SKILLS.find((s) => s.id === runningSkill)?.label}... Results will appear as cells update.
           </span>
         </div>
       )}
@@ -248,9 +303,11 @@ export default function TableViewPage() {
                         title={row[h] ?? ""}
                       >
                         {row[h] ? (
-                          <CellValue value={row[h]!} />
+                          <ClickToCopyCell value={row[h]!} />
                         ) : (
-                          <span className="text-muted-foreground">—</span>
+                          <span className="text-muted-foreground/40 text-xs italic">
+                            empty
+                          </span>
                         )}
                       </td>
                     ))}
@@ -266,38 +323,64 @@ export default function TableViewPage() {
       {rows.length > 0 && (
         <div className="shrink-0 border-t border-border px-6 py-2 flex items-center justify-between text-xs text-muted-foreground">
           <span>{rows.length} rows</span>
-          <span>{headers.length} columns</span>
+          <div className="flex items-center gap-4">
+            <span>Click any cell to copy</span>
+            <span>{headers.length} columns</span>
+          </div>
         </div>
       )}
     </>
   );
 }
 
-/** Simple cell value renderer with type detection */
+/** Cell with click-to-copy + type detection */
+function ClickToCopyCell({ value }: { value: string }) {
+  const [copied, setCopied] = useState(false);
+
+  function handleClick(e: React.MouseEvent) {
+    e.stopPropagation();
+    navigator.clipboard.writeText(value);
+    setCopied(true);
+    toast.success("Copied to clipboard", { duration: 1500 });
+    setTimeout(() => setCopied(false), 1500);
+  }
+
+  return (
+    <button
+      onClick={handleClick}
+      className="group relative text-left w-full truncate flex items-center gap-1 hover:text-primary transition-colors"
+    >
+      <span className="truncate">
+        <CellValue value={value} />
+      </span>
+      <span className="opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+        {copied ? (
+          <Check className="w-3 h-3 text-emerald-500" />
+        ) : (
+          <Copy className="w-3 h-3 text-muted-foreground" />
+        )}
+      </span>
+    </button>
+  );
+}
+
+/** Value renderer with type detection */
 function CellValue({ value }: { value: string }) {
-  // URL
   if (/^https?:\/\//i.test(value)) {
     return (
-      <a
-        href={value}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="text-blue-400 hover:underline truncate flex items-center gap-1"
-      >
+      <span className="text-blue-400 truncate flex items-center gap-1">
         <ExternalLink className="w-3 h-3 shrink-0" />
         <span className="truncate">
           {value.replace(/^https?:\/\/(www\.)?/, "")}
         </span>
-      </a>
+      </span>
     );
   }
 
-  // Email
   if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
     return <span className="text-blue-400">{value}</span>;
   }
 
-  // JSON (enrichment result)
   if (value.startsWith("{") || value.startsWith("[")) {
     try {
       const parsed = JSON.parse(value);
@@ -320,4 +403,41 @@ function CellValue({ value }: { value: string }) {
   }
 
   return <span>{value}</span>;
+}
+
+/** Escape a value for CSV output */
+function escCsv(val: string): string {
+  if (val.includes(",") || val.includes('"') || val.includes("\n")) {
+    return `"${val.replace(/"/g, '""')}"`;
+  }
+  return val;
+}
+
+/** Save a recent enrichment to localStorage for the home page "run again" feature */
+function saveRecentEnrichment(
+  spreadsheetId: string,
+  skillId: string,
+  skillName: string,
+  rowCount: number,
+) {
+  const key = "clay-recent-enrichments";
+  const saved = localStorage.getItem(key);
+  const recent: Array<{
+    spreadsheetId: string;
+    skillId: string;
+    skillName: string;
+    rowCount: number;
+    timestamp: string;
+  }> = saved ? JSON.parse(saved) : [];
+
+  recent.unshift({
+    spreadsheetId,
+    skillId,
+    skillName,
+    rowCount,
+    timestamp: new Date().toISOString(),
+  });
+
+  // Keep only last 10
+  localStorage.setItem(key, JSON.stringify(recent.slice(0, 10)));
 }
