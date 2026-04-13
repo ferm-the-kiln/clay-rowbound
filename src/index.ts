@@ -70,6 +70,19 @@ export {
   type CellStatus,
   StatusAccumulator,
 } from "./core/status-sheet.js";
+export {
+  assemblePrompt,
+  executeSkillAction,
+  extractEntityKey,
+  listSkills,
+  loadContextFiles,
+  loadSkill,
+  parseSkillFrontmatter,
+} from "./core/skill.js";
+export {
+  checkCache,
+  writeCache,
+} from "./core/supabase-cache.js";
 export { resolveObject, resolveTemplate } from "./core/template.js";
 export type {
   Action,
@@ -94,6 +107,7 @@ export type {
   ScriptDef,
   ScriptSource,
   SheetRef,
+  SkillAction,
   Source,
   SourceResult,
   TabConfig,

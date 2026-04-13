@@ -317,6 +317,29 @@ export interface ActionCommon {
   env?: Record<string, string>;
 }
 
+/** Skill action: runs a Clay skill (skill.md + knowledge base context + Claude) */
+export interface SkillAction {
+  id: string;
+  type: "skill";
+  /** Target column to write the primary output */
+  target: string;
+  when?: string;
+  /** Skill ID — maps to skills/{skillId}/skill.md */
+  skillId: string;
+  /** Model override (e.g. "claude-opus-4-5-20250514"). If omitted, uses skill's model_tier. */
+  model?: string;
+  /** Client slug — loads clients/{slug}/profile.md context */
+  clientSlug?: string;
+  /** Template for Supabase cache key, e.g. "{{row.Domain}}". If omitted, auto-extracts from row. */
+  cacheKey?: string;
+  /** Maps JSON output keys to additional column names for multi-field output */
+  outputs?: Record<string, string>;
+  /** Timeout in seconds (default: 120) */
+  timeout?: number;
+  onError?: OnErrorConfig;
+  runSettings?: ActionRunSettings;
+}
+
 /** Union of all action types, with common optional fields */
 export type Action = (
   | HttpAction
@@ -327,6 +350,7 @@ export type Action = (
   | WriteAction
   | ScriptAction
   | AiAction
+  | SkillAction
 ) &
   ActionCommon;
 

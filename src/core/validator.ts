@@ -10,6 +10,7 @@ import type {
   PipelineConfig,
   ScriptAction,
   ScriptSource,
+  SkillAction,
   Source,
   WaterfallAction,
   WriteAction,
@@ -35,6 +36,7 @@ const VALID_ACTION_TYPES = new Set([
   "write",
   "script",
   "ai",
+  "skill",
 ]);
 
 /** Known retry backoff strategies. */
@@ -461,6 +463,19 @@ export function validateConfig(config: PipelineConfig): ValidationResult {
       ) {
         errors.push(
           `${label}: 'timeout' must be a positive number (got ${JSON.stringify(aiAction.timeout)})`,
+        );
+      }
+    } else if (action.type === "skill") {
+      const skillAction = action as SkillAction;
+      if (!skillAction.skillId) {
+        errors.push(`${label}: skill action missing 'skillId'`);
+      }
+      if (
+        skillAction.timeout !== undefined &&
+        (typeof skillAction.timeout !== "number" || skillAction.timeout <= 0)
+      ) {
+        errors.push(
+          `${label}: 'timeout' must be a positive number (got ${JSON.stringify(skillAction.timeout)})`,
         );
       }
     }

@@ -26,8 +26,11 @@ import type {
   Row,
   ScriptAction,
   SheetRef,
+  SkillAction,
   WriteAction,
 } from "./types.js";
+import { executeSkillAction, extractEntityKey } from "./skill.js";
+import { checkCache, writeCache } from "./supabase-cache.js";
 import { executeWaterfall } from "./waterfall.js";
 import { executeWrite } from "./write-action.js";
 
@@ -461,6 +464,61 @@ export async function runPipeline(
             },
           );
           value = aiUpdates.length > 0 ? aiUpdates[0]!.value : null;
+        } else if (action.type === "skill") {
+          const skillAction = action as SkillAction;
+
+          // Check Supabase cache before executing
+          let cacheHit = false;
+          if (skillAction.cacheKey || true) {
+            // Resolve cache key from template or auto-extract entity key
+            let entityType: string | undefined;
+            let entityId: string | undefined;
+
+            if (skillAction.cacheKey) {
+              const resolvedKey = resolveTemplate(skillAction.cacheKey, actionContext);
+              if (resolvedKey) {
+                entityType = "custom";
+                entityId = resolvedKey.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+              }
+            } else {
+              const entity = extractEntityKey(actionContext.row);
+              if (entity) {
+                entityType = entity.entityType;
+                entityId = entity.entityId;
+              }
+            }
+
+            if (entityType && entityId) {
+              const cached = await checkCache(skillAction.skillId, entityType, entityId);
+              if (cached) {
+                value = JSON.stringify(cached);
+                cacheHit = true;
+              }
+            }
+
+            if (!cacheHit) {
+              const skillUpdates = await executeSkillAction(
+                skillAction,
+                actionContext,
+                {
+                  signal,
+                  rowIndex: i,
+                  columnMap: options.columnMap,
+                },
+              );
+              value = skillUpdates.length > 0 ? skillUpdates[0]!.value : null;
+
+              // Cache the result
+              if (value && entityType && entityId) {
+                try {
+                  const parsed = JSON.parse(value);
+                  await writeCache(skillAction.skillId, entityType, entityId, parsed);
+                } catch {
+                  // Value isn't JSON — skip caching
+                }
+              }
+            }
+          }
         }
 
         if (value !== null) {
