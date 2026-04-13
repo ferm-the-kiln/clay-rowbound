@@ -2,13 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Table2, Sparkles, Settings } from "lucide-react";
+import { Home, FolderOpen, Sparkles, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navItems = [
   { href: "/", label: "Home", icon: Home },
-  { href: "/tables", label: "Tables", icon: Table2 },
-  { href: "/enrich", label: "Enrich", icon: Sparkles },
+  { href: "/tables", label: "Enrichments", icon: FolderOpen },
+  { href: "/enrich", label: "New Enrichment", icon: Sparkles },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 
