@@ -219,7 +219,7 @@ export function registerSetup(program: Command): void {
         if (setupAgent.toLowerCase() === "y") {
           installLaunchAgent();
         } else {
-          skip("LaunchAgent skipped — start manually: rowbound watch --port 3000");
+          skip("LaunchAgent skipped — start manually: rowbound watch --port 3001");
         }
       }
 
@@ -302,7 +302,7 @@ function installLaunchAgent() {
     <string>${rowboundBin}</string>
     <string>watch</string>
     <string>--port</string>
-    <string>3000</string>
+    <string>3001</string>
   </array>
   <key>RunAtLoad</key>
   <true/>
@@ -334,6 +334,6 @@ function installLaunchAgent() {
     check("LaunchAgent installed — Rowbound starts automatically on login");
     console.log(pc.dim(`  Logs: /tmp/rowbound-watch.log`));
   } catch {
-    fail("LaunchAgent setup failed. Start manually: rowbound watch --port 3000");
+    fail("LaunchAgent setup failed. Start manually: rowbound watch --port 3001");
   }
 }

@@ -11,7 +11,7 @@
 		<string>watch</string>
 		<string>SHEET_ID</string>
 		<string>--port</string>
-		<string>3000</string>
+		<string>3001</string>
 	</array>
 
 	<key>RunAtLoad</key>

@@ -34,7 +34,7 @@ export function ConnectionStatusIndicator() {
     };
   }, []);
 
-  const command = "rowbound watch YOUR_SHEET_ID --port 3000";
+  const command = "rowbound watch YOUR_SHEET_ID --port 3001";
 
   function handleCopy() {
     navigator.clipboard.writeText(command);

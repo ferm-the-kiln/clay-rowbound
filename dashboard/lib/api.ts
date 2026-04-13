@@ -2,13 +2,13 @@
  * Minimal API client for the Clay Rowbound dashboard.
  *
  * Two targets:
- * 1. localhost:3000 — Rowbound watch webhook server (trigger enrichments, health check)
+ * 1. localhost:3001 — Rowbound watch webhook server (trigger enrichments, health check)
  * 2. /api/* — Next.js API routes (Google Sheets data, proxied through server-side)
  */
 
 import type { EnrichmentResult, SheetRow } from "./types";
 
-const ROWBOUND_URL = "http://localhost:3000";
+const ROWBOUND_URL = "http://localhost:3001";
 
 // ---------------------------------------------------------------------------
 // Rowbound watch (localhost)

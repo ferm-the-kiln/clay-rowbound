@@ -66,8 +66,8 @@ export default function SettingsPage() {
   }
 
   const watchCommand = sheets.length > 0
-    ? `rowbound watch ${sheets[0]!.id} --port 3000`
-    : "rowbound watch YOUR_SHEET_ID --port 3000";
+    ? `rowbound watch ${sheets[0]!.id} --port 3001`
+    : "rowbound watch YOUR_SHEET_ID --port 3001";
 
   function handleCopy() {
     navigator.clipboard.writeText(watchCommand);
@@ -98,7 +98,7 @@ export default function SettingsPage() {
                 />
                 <span className="text-sm">
                   {isConnected
-                    ? "Rowbound is running on localhost:3000"
+                    ? "Rowbound is running on localhost:3001"
                     : "Rowbound is not running"}
                 </span>
                 <Badge variant={isConnected ? "default" : "destructive"}>
