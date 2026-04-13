@@ -178,9 +178,12 @@ export default function EnrichPage() {
     setCreateError(null);
 
     try {
-      // Create a Google Sheet from the CSV data
-      const skillName = SKILLS.find((s) => s.id === selectedSkill)?.name ?? selectedSkill;
-      const title = `${csvData.fileName.replace(/\.csv$/i, "")} — ${skillName}`;
+      // Create a Google Sheet from the CSV data, organized in Drive folders
+      const skill = SKILLS.find((s) => s.id === selectedSkill);
+      const skillName = skill?.name ?? selectedSkill;
+      const category = skill?.category ?? "other";
+      const date = new Date().toISOString().slice(0, 10);
+      const title = `${skillName} — ${csvData.fileName.replace(/\.csv$/i, "")} — ${date}`;
 
       const res = await fetch("/api/sheets", {
         method: "POST",
@@ -189,6 +192,8 @@ export default function EnrichPage() {
           title,
           headers: csvData.headers,
           rows: csvData.rows,
+          skillId: selectedSkill,
+          category,
         }),
       });
 
