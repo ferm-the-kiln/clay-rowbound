@@ -8,7 +8,7 @@
  * - entity_utils.py (entity key extraction for caching)
  */
 
-import { readFileSync, existsSync, readdirSync } from "node:fs";
+import { readFileSync, existsSync, readdirSync, statSync } from "node:fs";
 import { join, resolve, dirname } from "node:path";
 import { parse as parseYaml } from "yaml";
 import { executeAiAction } from "./ai.js";
@@ -80,7 +80,7 @@ export function loadSkill(skillId: string): { config: SkillConfig; body: string 
   const skillFile = join(BASE_DIR, "skills", skillId, "skill.md");
   if (!existsSync(skillFile)) return null;
 
-  const { mtimeMs } = require("node:fs").statSync(skillFile);
+  const { mtimeMs } = statSync(skillFile);
   const cached = skillCache.get(skillId);
   if (cached && cached.mtime === mtimeMs) {
     return { config: cached.config, body: cached.body };
@@ -430,14 +430,8 @@ export async function executeSkillAction(
   // 4. Assemble prompt
   const prompt = assemblePrompt(skill.body, contextFiles, context.row, outputFormat);
 
-  // 5. Determine model from action override or skill config
-  const modelTierMap: Record<string, string> = {
-    light: "claude-haiku-4-5-20251001",
-    standard: "claude-sonnet-4-5-20250514",
-    heavy: "claude-opus-4-5-20250514",
-  };
-  const model =
-    action.model ?? (skill.config.model_tier ? modelTierMap[skill.config.model_tier] : undefined);
+  // 5. Determine model — use action override or let claude pick the default
+  const model = action.model ?? undefined;
 
   // 6. Delegate to the existing AI action executor
   //    This reuses Rowbound's proven claude -p subprocess handling
