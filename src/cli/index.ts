@@ -7,6 +7,7 @@ import { getGlobalEnvPath, registerEnv } from "./env.js";
 import { registerInit } from "./init.js";
 import { registerRun } from "./run.js";
 import { registerRuns } from "./runs.js";
+import { registerSetup } from "./setup.js";
 import { registerSource } from "./source.js";
 import { registerStatus } from "./status.js";
 import { registerSync } from "./sync.js";
@@ -30,6 +31,7 @@ program
   .version(pkg.version);
 
 registerInit(program);
+registerSetup(program);
 registerRun(program);
 registerConfig(program);
 registerStatus(program);
