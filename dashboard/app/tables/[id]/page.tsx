@@ -24,7 +24,7 @@ import {
   Copy,
   Check,
 } from "lucide-react";
-import { fetchSheetRows, triggerEnrichment, checkHealth } from "@/lib/api";
+import { fetchSheetRows } from "@/lib/api";
 import type { SheetRow } from "@/lib/types";
 
 const SKILL_CATEGORIES = {
@@ -89,39 +89,25 @@ export default function TableViewPage() {
     return () => clearInterval(interval);
   }, [running, loadData]);
 
-  async function handleRunSkill(skillId: string) {
-    const connected = await checkHealth();
-    if (!connected) {
-      toast.error("Rowbound is not running. Start it first.");
-      return;
-    }
-
+  function handleRunSkill(skillId: string) {
     const skillName = ALL_SKILLS.find((s) => s.id === skillId)?.label ?? skillId;
+    const command = `cd /Users/fermandujar/Documents/clay-rowbound && npx tsx src/cli/index.ts enrich ${spreadsheetId} --skill ${skillId}`;
 
-    try {
-      setRunning(true);
-      setRunningSkill(skillId);
-      setError(null);
-      toast.info(`Running ${skillName} on ${rows.length} rows...`);
+    navigator.clipboard.writeText(command);
+    toast.success(`Command copied! Paste in your terminal to run ${skillName}`, {
+      duration: 5000,
+    });
 
-      // Save to recent enrichments
-      saveRecentEnrichment(spreadsheetId, skillId, skillName, rows.length);
+    // Save to recent enrichments
+    saveRecentEnrichment(spreadsheetId, skillId, skillName, rows.length);
 
-      await triggerEnrichment(spreadsheetId, skillId);
-      // Poll for a bit then stop
-      setTimeout(() => {
-        setRunning(false);
-        setRunningSkill(null);
-        loadData();
-        toast.success(`${skillName} complete!`);
-      }, 10000);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Enrichment failed";
-      toast.error(msg);
-      setError(msg);
+    // Start polling for results
+    setRunning(true);
+    setRunningSkill(skillId);
+    setTimeout(() => {
       setRunning(false);
       setRunningSkill(null);
-    }
+    }, 120000); // Poll for up to 2 minutes
   }
 
   // --- CSV Export ---

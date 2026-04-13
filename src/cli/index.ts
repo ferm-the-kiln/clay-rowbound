@@ -5,6 +5,7 @@ import dotenv from "dotenv";
 import { registerConfig } from "./config.js";
 import { getGlobalEnvPath, registerEnv } from "./env.js";
 import { registerInit } from "./init.js";
+import { registerEnrich } from "./enrich.js";
 import { registerRun } from "./run.js";
 import { registerRuns } from "./runs.js";
 import { registerSetup } from "./setup.js";
@@ -32,6 +33,7 @@ program
 
 registerInit(program);
 registerSetup(program);
+registerEnrich(program);
 registerRun(program);
 registerConfig(program);
 registerStatus(program);
